@@ -1,0 +1,26 @@
+#!/usr/bin/env -S uv run --quiet python3
+"""Assemble the static play-White page into build/web/: the files in web/ plus the card set as
+cards.txt.  The result is plain static files (no server code); upload the directory anywhere, e.g.
+`wrangler pages deploy build/web --project-name snaky`.
+
+usage: tools/build-web [OUT_DIR]      (default build/web)
+"""
+import os
+import shutil
+import sys
+
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FILES = ["index.html", "style.css", "app.js", "engine.js"]
+
+
+def main():
+    out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "build", "web")
+    os.makedirs(out, exist_ok=True)
+    for f in FILES:
+        shutil.copyfile(os.path.join(HERE, "web", f), os.path.join(out, f))
+    shutil.copyfile(os.path.join(HERE, "cert", "snaky-15x15-cards.txt"), os.path.join(out, "cards.txt"))
+    print(f"wrote {out}: {', '.join(FILES + ['cards.txt'])}")
+
+
+if __name__ == "__main__":
+    main()
