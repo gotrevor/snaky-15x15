@@ -8,6 +8,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -22,7 +23,7 @@ def run_schedule(tmp_path, *args):
     fake.chmod(0o755)
     env = dict(os.environ, PATH=str(tmp_path) + os.pathsep + os.environ["PATH"],
                SNAKY_LAKE_RECORD=str(record))
-    p = subprocess.run([str(ROOT / "tools/build-kernel"), *args],
+    p = subprocess.run([sys.executable, str(ROOT / "tools/build-kernel"), *args],
                        env=env, capture_output=True, text=True, timeout=60)
     assert p.returncode == 0, p.stdout + p.stderr
     return p.stdout, [json.loads(line) for line in record.read_text().splitlines()]
