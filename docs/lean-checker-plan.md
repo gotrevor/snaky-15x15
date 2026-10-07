@@ -32,6 +32,9 @@ free-cell budget `|B| + |W| + 2h ≤ R C`.
   laptop; split into pieces of at most 5 GB it took 69 s.  Comparator with nanoda passed on card 0
   there ("Your solution is okay!").  nanoda runs 1.5-1.9x the Lean kernel's time with less memory
   (5.5 GB against 9.1 GB on card 0), and its peak does not grow across theorems.
+  Full proof on the 2 CPU / 8 GB runner, 2026-10-07 (run 37672170101, commit 3a90fdc): build-kernel
+  38 min (99 batches, budget 5.8 GB); comparator 64 min wall, max RSS 4.5 GB, no swap; both
+  kernels accept ("Your solution is okay!").  The job takes about 1 h 50 min end to end.
 - `lean/CardCheck.lean`: `cardcheck` executable, same checker compiled; `tests/test_lean_cards.py`,
   `tests/test_kernel_cards.py`.
 - Comparator: `lean/Comparator/Snaky/` (strong pattern; local statement-identity pre-flight passes).
