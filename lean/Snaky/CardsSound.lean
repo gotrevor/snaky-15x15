@@ -220,6 +220,22 @@ theorem allOK_spec {cs : Array Card} (hall : allOK cs = true) :
   obtain ⟨hlt, rfl⟩ := Array.getElem?_eq_some_iff.1 hj
   exact Array.getElem_mem_toList hlt
 
+/-- A big card checked in pieces: its head, and its replies over a list `L` covering `S`. -/
+theorem cardOK_of_split {get : Nat → Option Card} {c : Card} (L : List Pt)
+    (hh : cardHead get c = true) (hcov : c.S.all (fun w => L.contains w) = true)
+    (hL : L.all (replyOK get c) = true) : cardOK get c = true := by
+  unfold cardHead at hh
+  simp only [Bool.and_eq_true] at hh
+  unfold cardOK
+  simp only [hh.1.1, hh.1.2, hh.2, Bool.and_eq_true, Bool.or_eq_true, true_and, Bool.true_and]
+  right
+  rw [List.all_eq_true] at hcov hL ⊢
+  intro w hw
+  exact hL w (List.contains_iff_mem.1 (hcov w hw))
+
+theorem CTree.all_leaf {p : Card → Bool} {i : Nat} {c : Card} (h : p c = true) :
+    (CTree.leaf i c).all p = true := h
+
 theorem CTree.all_node {p : Card → Bool} {m : Nat} {l r : CTree} (hl : l.all p = true)
     (hr : r.all p = true) : (CTree.node m l r).all p = true := by
   simp [CTree.all, hl, hr]
@@ -317,6 +333,7 @@ theorem sound_aux {get : Nat → Option Card}
         have hr := List.all_eq_true.1 hreps w0 hw0S
         have hw0' : (c.p :: c.A).contains w0 = false := by
           simpa [List.contains_iff_mem] using hw0
+        unfold replyOK at hr
         rw [hw0', Bool.false_or] at hr
         split at hr
         · rename_i hn _
@@ -325,7 +342,8 @@ theorem sound_aux {get : Nat → Option Card}
           refine ⟨hs.1, fun e => hs.2 (Xf.app_inj hg (idx_inj (hSinv s hs.1).1
             (hSinv w0 hw0S).1 e))⟩
         · simp at hr
-      · split at hpass
+      · unfold passOK at hpass
+        split at hpass
         · rename_i hn _
           refine step hn _ (fun s hs => ?_) hpass
           rw [List.contains_iff_mem] at hs

@@ -1,0 +1,84 @@
+# Build the kernel-checked proof, run the tests, and (on main and dispatch, not on PRs) run
+# comparator with nanoda.  One job: comparator needs the built .oleans, so a separate job would
+# repeat the build.
+# Proof modules are built in memory-bounded batches by tools/build-kernel (lake has no job
+# limit); tools/measure-kernel records per-module peak memory.  Measurements: docs/lean-checker-plan.md.
+name: ci
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      LEAN4EXPORT_TAG: v4.34.0       # no v4.34.1 tag; built on our toolchain below
+      LANDRUN_REV: 5e9a0d15d6009cdaf27133bf2d59d29e7018cc47
+      NANODA_REV: f58f2f6d535e189a40fcb02ede8eb95f97a92d37
+      COMPARATOR_REV: 68a064109f01c08f47c8edc9f51d6a2bbffaa188
+    steps:
+      - uses: actions/checkout@v4
+      - name: Runner resources
+        run: echo "### $(nproc) CPUs, $(free -h | awk '/Mem:/{print $2}') RAM" >> "$GITHUB_STEP_SUMMARY"
+      - uses: leanprover/lean-action@v1
+        with:
+          build: false
+          test: false
+          lint: false
+          use-mathlib-cache: false
+          lake-package-directory: lean
+      - name: Build the kernel-checked proof
+        run: |
+          python3 tools/build-kernel
+          (cd lean && lake build Comparator cardcheck)
+      - name: Axioms of the headline theorem
+        working-directory: lean
+        run: |
+          printf 'import Snaky\n#print axioms Snaky.snaky_wins_15x15\n' > /tmp/Ax.lean
+          lake env lean /tmp/Ax.lean | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Tests
+        run: |
+          python3 -m pip install --quiet pytest
+          python3 -m pytest -q tests
+      - name: Cache verifier binaries
+        id: cache-bins
+        if: github.event_name != 'pull_request'
+        uses: actions/cache@v4
+        with:
+          path: ~/verifier-bin
+          key: verifier-bin-${{ runner.os }}-${{ env.LEAN4EXPORT_TAG }}-${{ hashFiles('lean/lean-toolchain') }}-${{ env.LANDRUN_REV }}-${{ env.NANODA_REV }}-${{ env.COMPARATOR_REV }}
+      - name: Build landrun, lean4export, nanoda, comparator
+        if: github.event_name != 'pull_request' && steps.cache-bins.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p ~/verifier-bin ~/verifier-src && cd ~/verifier-src
+          git clone -q https://github.com/Zouuup/landrun.git
+          (cd landrun && git checkout -q "$LANDRUN_REV" && go build -o ~/verifier-bin/landrun ./cmd/landrun)
+          git clone -q https://github.com/ammkrn/nanoda_lib.git
+          (cd nanoda_lib && git checkout -q "$NANODA_REV" && cargo build -q --release && cp target/release/nanoda_bin ~/verifier-bin/)
+          git clone -q https://github.com/leanprover/lean4export.git
+          (cd lean4export && git checkout -q "$LEAN4EXPORT_TAG" \
+             && cp "$GITHUB_WORKSPACE/lean/lean-toolchain" lean-toolchain \
+             && lake build && cp .lake/build/bin/lean4export ~/verifier-bin/)
+          git clone -q https://github.com/leanprover/comparator.git
+          (cd comparator && git checkout -q "$COMPARATOR_REV" && lake build comparator && cp .lake/build/bin/comparator ~/verifier-bin/)
+      - name: Comparator (Lean kernel + nanoda)
+        if: github.event_name != 'pull_request'
+        working-directory: lean
+        run: |
+          export PATH="$HOME/verifier-bin:$PATH"
+          set -o pipefail
+          /usr/bin/time -v lake env comparator Comparator/Snaky/config.json 2>&1 | tee /tmp/comparator.log
+          grep -E "Elapsed|Maximum resident" /tmp/comparator.log >> "$GITHUB_STEP_SUMMARY" || true

@@ -4,7 +4,7 @@ import Snaky.Gen.Tree
 namespace Snaky.Gen
 
 set_option maxHeartbeats 0 in
-/-- Cards 5-6 are justified. -/
+/-- Cards 7-10 are justified. -/
 theorem t5_ok : t5.all (cardOK getK) = true := by decide +kernel
 
 end Snaky.Gen

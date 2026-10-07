@@ -1,0 +1,79 @@
+#!/usr/bin/env -S uv run --quiet python3
+"""Measure every kernel proof module of lean/Snaky/Gen on its own: wall time and peak RSS of
+`lake env lean FILE`, one process per module, --jobs at a time.  This is the check that no module
+needs more memory than a CI runner has (the cost model in cards2lean.py is only an estimate).
+Needs `lake build Snaky.Gen.Tree` first.  Glue modules (which import the pieces) are skipped:
+they only combine theorems.
+
+Writes TSV (module, seconds, peak GB) to --out (default build/kernel-measure.tsv), prints the
+largest ten.  Exit 1 if any module fails or exceeds --max-gb.
+
+usage: measure-kernel [--jobs N] [--max-gb G] [--out PATH]
+"""
+import concurrent.futures as cf
+import os
+import platform
+import re
+import subprocess
+import sys
+import time
+
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LEAN = os.path.join(HERE, "lean")
+GEN = os.path.join(LEAN, "Snaky", "Gen")
+
+
+def measure(path):
+    flag = "-l" if platform.system() == "Darwin" else "-v"
+    t0 = time.time()
+    r = subprocess.run(["/usr/bin/time", flag, "lake", "env", "lean", path], cwd=LEAN,
+                       capture_output=True, text=True)
+    dt = time.time() - t0
+    m = re.search(r"(\d+)\s+maximum resident set size", r.stderr)      # macOS: bytes
+    if m:
+        gb = int(m.group(1)) / 1e9
+    else:
+        m = re.search(r"Maximum resident set size \(kbytes\): (\d+)", r.stderr)  # GNU: KB
+        gb = int(m.group(1)) * 1e3 / 1e9 if m else float("nan")
+    return path, r.returncode, dt, gb, (r.stdout + r.stderr)[-2000:]
+
+
+def main():
+    opts = dict(zip(sys.argv[1::2], sys.argv[2::2]))
+    jobs = int(opts.get("--jobs", 4))
+    max_gb = float(opts.get("--max-gb", 1e9))
+    out = opts.get("--out", os.path.join(HERE, "build", "kernel-measure.tsv"))
+    files = []
+    for f in sorted(os.listdir(GEN)):
+        if f.startswith("Chunk") and f.endswith(".lean"):
+            p = os.path.join(GEN, f)
+            imports = [l for l in open(p) if l.startswith("import ")]
+            if imports == ["import Snaky.Gen.Tree\n"]:
+                files.append(p)
+    rows, bad = [], []
+    t0 = time.time()
+    with cf.ThreadPoolExecutor(jobs) as ex:
+        for path, rc, dt, gb, tail in ex.map(measure, files):
+            name = os.path.basename(path)[:-5]
+            rows.append((name, dt, gb))
+            if rc != 0:
+                bad.append(f"{name}: exit {rc}\n{tail}")
+            elif gb > max_gb:
+                bad.append(f"{name}: {gb:.1f} GB > {max_gb} GB")
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, "w") as fh:
+        fh.write("module\tseconds\tpeak_gb\n")
+        for name, dt, gb in rows:
+            fh.write(f"{name}\t{dt:.1f}\t{gb:.2f}\n")
+    rows.sort(key=lambda r: -r[2])
+    print(f"{len(rows)} modules in {time.time() - t0:.0f} s wall, "
+          f"{sum(r[1] for r in rows):.0f} s summed; largest by memory:")
+    for name, dt, gb in rows[:10]:
+        print(f"  {name}\t{dt:6.1f} s\t{gb:5.2f} GB")
+    for b in bad:
+        print("FAIL", b)
+    sys.exit(1 if bad else 0)
+
+
+if __name__ == "__main__":
+    main()

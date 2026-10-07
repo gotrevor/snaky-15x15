@@ -2,11 +2,15 @@
 """Build the kernel-checked proof in memory-bounded batches.  `lake build` has no job limit, and
 the heaviest chunk theorems take several GB each, so running all 180 at once can exhaust RAM.
 
-Peak memory per chunk is estimated from `lean/Snaky/Gen/chunks.json` (written by cards2lean.py)
+Peak memory per proof module comes from `docs/kernel-measure.tsv` (tools/measure-kernel) when it
+lists the module, else is estimated from `lean/Snaky/Gen/modules.json` (cards2lean.py)
 as BASE + 2 KB per unit (the probe's cost model), and chunks are built in batches whose estimates
-sum to at most --budget GB (and at most --jobs chunks).  Then the rest of the library is built.
+sum to at most --budget GB (and at most --jobs chunks).  A batch holds only modules whose proof-module
+imports are already built, so Lake never pulls an unbudgeted dependency into a batch (the glue module
+of a split card imports its pieces).  Then the rest of the library is built.
 
 usage: build-kernel [--budget GB] [--jobs N]
+  --budget defaults to 70% of physical RAM, --jobs to the CPU count.
 """
 import json
 import os
@@ -20,27 +24,47 @@ BASE_GB = 1.5
 GB_PER_UNIT = 2e-6
 
 
+def imports(module):
+    path = os.path.join(LEAN, *module.split(".")) + ".lean"
+    return {line.split()[1] for line in open(path) if line.startswith("import ")}
+
+
 def main():
     opts = dict(zip(sys.argv[1::2], sys.argv[2::2]))
-    budget = float(opts.get("--budget", 24))
+    ram_gb = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 1e9
+    budget = float(opts.get("--budget", 0.7 * ram_gb))
     jobs = int(opts.get("--jobs", os.cpu_count() or 4))
-    chunks = json.load(open(os.path.join(LEAN, "Snaky", "Gen", "chunks.json")))
-    est = {c["chunk"]: BASE_GB + GB_PER_UNIT * c["units"] for c in chunks}
-    order = sorted(est, key=lambda k: -est[k])
-    batches, cur, used = [], [], 0.0
-    for k in order:
-        if cur and (used + est[k] > budget or len(cur) >= jobs):
-            batches.append(cur)
-            cur, used = [], 0.0
-        cur.append(k)
-        used += est[k]
-    batches.append(cur)
+    mods = json.load(open(os.path.join(LEAN, "Snaky", "Gen", "modules.json")))
+    est = {m["module"]: BASE_GB + GB_PER_UNIT * m["units"] for m in mods}
+    # measured peaks (tools/measure-kernel, copied to docs/) override the estimate, plus 10%
+    measured = os.path.join(HERE, "docs", "kernel-measure.tsv")
+    if os.path.exists(measured):
+        for line in open(measured).read().splitlines()[1:]:
+            name, _, gb = line.split("\t")
+            if "Snaky.Gen." + name in est:
+                est["Snaky.Gen." + name] = 1.1 * float(gb)
+    deps = {k: imports(k) & est.keys() for k in est}
+    batches, done, left = [], set(), set(est)
+    while left:
+        ready = sorted((k for k in left if deps[k] <= done), key=lambda k: (-est[k], k))
+        if not ready:
+            sys.exit(f"[build-kernel] import cycle among {sorted(left)}")
+        cur, used = [], 0.0
+        for k in ready:
+            if not cur or (used + est[k] <= budget and len(cur) < jobs):
+                cur.append(k)
+                used += est[k]
+        batches.append(cur)
+        done.update(cur)
+        left.difference_update(cur)
+    print(f"[build-kernel] {len(est)} proof modules, {len(batches)} batches, budget {budget:.1f} GB, "
+          f"{jobs} jobs", flush=True)
     t0 = time.time()
     subprocess.run(["lake", "build", "Snaky.Gen.Tree"], cwd=LEAN, check=True)
     for b, ks in enumerate(batches):
-        print(f"[build-kernel] batch {b + 1}/{len(batches)}: {len(ks)} chunks, "
+        print(f"[build-kernel] batch {b + 1}/{len(batches)}: {len(ks)} modules, "
               f"est {sum(est[k] for k in ks):.1f} GB, {time.time() - t0:.0f} s elapsed", flush=True)
-        subprocess.run(["lake", "build", *[f"Snaky.Gen.Chunk{k:03d}" for k in ks]],
+        subprocess.run(["lake", "build", *ks],
                        cwd=LEAN, check=True)
     subprocess.run(["lake", "build"], cwd=LEAN, check=True)
     print(f"[build-kernel] done in {time.time() - t0:.0f} s", flush=True)

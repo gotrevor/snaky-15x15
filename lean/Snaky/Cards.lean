@@ -82,17 +82,27 @@ def hintOK (get : Nat → Option Card) (h : Nat) (B : List Pt) (R : Pt → Bool)
       c'.A.all (fun a => B.contains (hint.2.app a)) && c'.S.all (fun s => R (hint.2.app s))
   | none => false
 
+/-- White passes (moves outside `S`): the pass hint covers `(p :: A, S)`. -/
+def passOK (get : Nat → Option Card) (c : Card) : Bool :=
+  match c.pass with
+  | some hn => hintOK get c.h (c.p :: c.A) (fun s => c.S.contains s) hn
+  | none => false
+
+/-- White replies at `w`: `w` is already Black's, or its hint covers `(p :: A, S - w)`. -/
+def replyOK (get : Nat → Option Card) (c : Card) (w : Pt) : Bool :=
+  (c.p :: c.A).contains w ||
+    match c.replies.lookup w with
+    | some hn => hintOK get c.h (c.p :: c.A) (fun s => c.S.contains s && s != w) hn
+    | none => false
+
 def cardOK (get : Nat → Option Card) (c : Card) : Bool :=
-  let B := c.p :: c.A
   decide (1 ≤ c.h) && c.S.contains c.p &&
-  (wonPlane B ||
-    ((match c.pass with
-      | some hn => hintOK get c.h B (fun s => c.S.contains s) hn
-      | none => false) &&
-     c.S.all fun w => B.contains w ||
-       match c.replies.lookup w with
-       | some hn => hintOK get c.h B (fun s => c.S.contains s && s != w) hn
-       | none => false))
+  (wonPlane (c.p :: c.A) || (passOK get c && c.S.all (replyOK get c)))
+
+/-- Everything in `cardOK` except the replies (the kernel path checks a big card's replies in
+several declarations; `cardOK_of_split`). -/
+def cardHead (get : Nat → Option Card) (c : Card) : Bool :=
+  decide (1 ≤ c.h) && c.S.contains c.p && passOK get c
 
 def allOK (cs : Array Card) : Bool := cs.toList.all (cardOK (cs[·]?))
 

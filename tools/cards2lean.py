@@ -5,13 +5,19 @@ file (cert/snaky-15x15-cards.txt, format of tools/cards2txt.py).
   Snaky/Gen/DataNN.lean    `def cI : Card := ...`, 500 cards per file
   Snaky/Gen/Tree.lean      subtrees `tK : CTree` (one per chunk), the whole lookup `tree`, `getK`
   Snaky/Gen/ChunkNNN.lean  `theorem tK_ok : tK.all (cardOK getK) = true := by decide +kernel`
+                           (big cards: ChunkNNNHead.lean, ChunkNNNR*.lean, glued in ChunkNNN)
   Snaky/Gen/All.lean       `tree_ok` (glue of the chunk theorems) and `root_ok`
 
 The kernel evaluates every chunk; nothing here is trusted.  Chunks are packed by an estimated
 kernel cost (list-membership comparisons, from the probe on branch wip/kernel-probe: about 7 us and
 2 KB each) so each declaration stays within a few GB.
 
-usage: cards2lean.py CARDS.txt LEAN_DIR [--units N] [--max-cards N]
+A card over the cap (--units, default 1.5M, about 3 GB) is checked in pieces: `cardHead` and its
+replies over consecutive pieces of its region, one declaration and file each, combined by
+`cardOK_of_split`.  `modules.json` lists every proof module with its estimated units, for
+`tools/build-kernel`.
+
+usage: cards2lean.py CARDS.txt LEAN_DIR [--units N] [--max-cards N] [--max-cells N]
 """
 import os
 import sys
@@ -87,6 +93,43 @@ def units(c, cards):
     return u
 
 
+def head_units(c, cards):
+    """`cardHead`: the move's membership test plus the pass hint."""
+    B = len(c["A"]) + 1
+    u = len(c["S"])
+    if c["pass"]:
+        j = c["pass"][0]
+        u += len(cards[j]["A"]) * B + len(cards[j]["S"]) * len(c["S"])
+    return u
+
+
+def reply_units(c, w, cards):
+    """`replyOK c w`: membership in p :: A, the hint lookup, and the hint's cover test."""
+    B = len(c["A"]) + 1
+    u = B + len(c["replies"])
+    h = dict(c["replies"]).get(w)
+    if h is not None:
+        u += len(cards[h[0]]["A"]) * B + len(cards[h[0]]["S"]) * len(c["S"])
+    return u
+
+
+def reply_parts(c, cards, cap, max_cells):
+    """Consecutive pieces of S whose reply checks each stay under `cap` units and `max_cells`
+    cells.  The cell cap is the binding one in practice: the unit estimate misjudges a big card's
+    replies by up to 10x (measured 2026-10-07: card 0's middle cells cost about 0.4 s and
+    110 MB each), so `tools/measure-kernel` is the check that the pieces stay small."""
+    parts, cur, cu = [], [], 0
+    for w in c["S"]:
+        u = reply_units(c, tuple(w), cards)
+        if cur and (cu + u > cap or len(cur) >= max_cells):
+            parts.append((cur, cu))
+            cur, cu = [], 0
+        cur.append(tuple(w))
+        cu += u
+    parts.append((cur, cu))
+    return parts
+
+
 def chunks(cards, max_units, max_cards):
     out, cur, cu = [], [], 0
     for n, c in enumerate(cards):
@@ -132,7 +175,8 @@ def main():
         write(os.path.join(gen, f"Data{f:02d}.lean"),
               HEADER + "import Snaky.Cards\n\nnamespace Snaky.Gen\n\n" + body + "\n\nend Snaky.Gen\n")
 
-    ch = chunks(cards, int(opts.get("units", 1_000_000)), int(opts.get("max-cards", 60)))
+    cap = int(opts.get("units", 1_500_000))
+    ch = chunks(cards, cap, int(opts.get("max-cards", 60)))
     subs = []
     for k, idx in enumerate(ch):
         t = balanced([(j, j + 1, None) for j in idx], lambda it: f"(.leaf {it[0]} c{it[0]})")
@@ -151,8 +195,12 @@ def getK : Nat → Option Card := tree.get
 
 end Snaky.Gen
 """)
+    modules = []
     for k, idx in enumerate(ch):
-        write(os.path.join(gen, f"Chunk{k:03d}.lean"), HEADER + f"""import Snaky.Gen.Tree
+        u = sum(units(cards[j], cards) for j in idx)
+        if len(idx) > 1 or u <= cap:
+            modules.append({"module": f"Snaky.Gen.Chunk{k:03d}", "units": u})
+            write(os.path.join(gen, f"Chunk{k:03d}.lean"), HEADER + f"""import Snaky.Gen.Tree
 
 namespace Snaky.Gen
 
@@ -162,6 +210,52 @@ theorem t{k}_ok : t{k}.all (cardOK getK) = true := by decide +kernel
 
 end Snaky.Gen
 """)
+            continue
+        # one big card: its head and its replies in pieces, one declaration (and file) each
+        i = idx[0]
+        c = cards[i]
+        parts = reply_parts(c, cards, cap, int(opts.get("max-cells", 15)))
+        write(os.path.join(gen, f"Chunk{k:03d}Head.lean"), HEADER + f"""import Snaky.Gen.Tree
+
+namespace Snaky.Gen
+
+set_option maxHeartbeats 0 in
+/-- Card {i}: move, height, and pass hint. -/
+theorem c{i}_head : cardHead getK c{i} = true := by decide +kernel
+
+end Snaky.Gen
+""")
+        modules.append({"module": f"Snaky.Gen.Chunk{k:03d}Head", "units": head_units(c, cards)})
+        for r, (ws, pu) in enumerate(parts):
+            write(os.path.join(gen, f"Chunk{k:03d}R{r}.lean"), HEADER + f"""import Snaky.Gen.Tree
+
+namespace Snaky.Gen
+
+def c{i}_part{r} : List Pt := [{', '.join(map(pt, ws))}]
+
+set_option maxHeartbeats 0 in
+/-- Card {i}: White replies at {len(ws)} cells of its region (piece {r + 1} of {len(parts)}). -/
+theorem c{i}_r{r} : c{i}_part{r}.all (replyOK getK c{i}) = true := by decide +kernel
+
+end Snaky.Gen
+""")
+            modules.append({"module": f"Snaky.Gen.Chunk{k:03d}R{r}", "units": pu})
+        L = " ++ ".join(f"c{i}_part{r}" for r in range(len(parts)))
+        rs = ", ".join(f"c{i}_r{r}" for r in range(len(parts)))
+        write(os.path.join(gen, f"Chunk{k:03d}.lean"), HEADER + f"import Snaky.Gen.Chunk{k:03d}Head\n"
+              + "".join(f"import Snaky.Gen.Chunk{k:03d}R{r}\n" for r in range(len(parts)))
+              + f"""import Snaky.CardsSound
+
+namespace Snaky.Gen
+
+/-- Card {i} is justified (checked in {len(parts) + 1} pieces). -/
+theorem t{k}_ok : t{k}.all (cardOK getK) = true :=
+  CTree.all_leaf (cardOK_of_split ({L}) c{i}_head (by decide +kernel)
+    (by simp only [List.all_append, {rs}, Bool.and_self]))
+
+end Snaky.Gen
+""")
+        modules.append({"module": f"Snaky.Gen.Chunk{k:03d}", "units": len(c["S"]) ** 2})
     glue = glue_proof(0, len(ch))
     k_, dx, dy = rxf
     write(os.path.join(gen, "All.lean"), HEADER + "".join(
@@ -178,11 +272,9 @@ theorem root_ok : rootOK getK {rows} {cols} {root} {xf(k_, dx, dy)} = true := by
 end Snaky.Gen
 """)
     import json
-    write(os.path.join(gen, "chunks.json"), json.dumps(
-        [{"chunk": k, "first": idx[0], "last": idx[-1],
-          "units": sum(units(cards[j], cards) for j in idx)} for k, idx in enumerate(ch)]) + "\n")
-    print(f"{n} cards, {nfiles} data files, {len(ch)} chunks; "
-          f"largest chunk {max(sum(units(cards[j], cards) for j in idx) for idx in ch):,} units")
+    write(os.path.join(gen, "modules.json"), json.dumps(modules, indent=0) + "\n")
+    print(f"{n} cards, {nfiles} data files, {len(ch)} chunks, {len(modules)} proof modules; "
+          f"largest {max(m['units'] for m in modules):,} units")
 
 
 def glue_proof(lo, hi):
