@@ -31,7 +31,7 @@ No per-position hand proofs: the certificate is data.
 The certificate is 1,750 JSON files, 2.7M stored nodes (93 MB JSON, 12 MB tar.gz), and the Python check visits 145.9M node-positions in ~12 min.  JSON as a Lean literal will not elaborate.  Options to evaluate first, smallest experiment first:
 - a compact binary encoding read through `include_bytes`-style embedding if available in the pinned toolchain (verify it exists before planning around it);
 - generated Lean source of `ByteArray`/`Array UInt32` chunks split across many files;
-- shrinking the data first: a parallel thread in the search repo is compressing the certificate into reusable cards (`~/src/snaky/docs/templates-report.md` when it lands); a card set may be far smaller.
+- shrinking the data first: the search repo compressed the certificate to **8,671 cards** (`~/src/snaky/probes/results/templates/snaky-15x15-cards.json`, 6.1 MB; independent checker `probes/templates/check_cards.py`, VALID in 0.7 s; method in `docs/templates-report.md`).  This trades the tree checker's soundness (lemmas 1-4 below) for a card-composition soundness lemma (a card = required Black set A inside region S, every White reply in S answered by a lower card).  The lemma is likely simpler than R3/R5 together, and the data is about 15x smaller.  Decide this first.
 Performance: the Lean checker should memoize (position, node) like the Python one; compiled Lean should match or beat Python.
 
 ## Suggested order
