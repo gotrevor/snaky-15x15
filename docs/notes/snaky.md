@@ -18,10 +18,10 @@ Root certificate sha256: `e9cd50f338b0e1b71d469bc32ccd41207907b9649c17da88dd8a85
 
 ## Context
 
-- Harary asked which polyominoes are "winners" in this game; Snaky is the one hexomino whose status stayed open.  As reported on Wikipedia's page on Harary's generalized tic-tac-toe, Harary conjectured that Snaky wins, on a board of size about 15.
+- Harary asked which polyominoes are "winners" in this game; Snaky is the one hexomino whose status stayed open.  Harary conjectured that Snaky wins on a 15 × 15 board (S. Boucher, PhD thesis, UQAM 2026, §7, citing Beck, *Combinatorial Games: Tic-Tac-Toe Theory*, 2008, where the conjecture is traced to a colleague of Harary who won every game on that board as first player).  Boucher's thesis still lists Snaky's status as open.
 - Halupczok and Schlage-Puchta, *Achieving Snaky* (Integers 7, 2007), proved that Snaky loses on 8 × 8, wins in three dimensions, and wins on the plane with one extra Black stone (handicap 1).
 - OpenAI, *Snaky in 21 Maker moves* (preprint dated 2026-09-25, `github.com/openai/math`), gives a Maker strategy winning within 21 Maker moves on the plane, proved in Lean 4 for the infinite board; the paper also derives a win on 17 × 17.
-- This certificate gives a win on 15 × 15, two rows and columns smaller than the 17 × 17 board in OpenAI's paper, checked as an explicit game tree.
+- This certificate gives a win on 15 × 15, the board size in Harary's conjecture and two rows and columns smaller than the 17 × 17 board in OpenAI's paper, checked as an explicit game tree.
 
 ## How the certificate is built
 
