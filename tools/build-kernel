@@ -1,0 +1,50 @@
+#!/usr/bin/env -S uv run --quiet python3
+"""Build the kernel-checked proof in memory-bounded batches.  `lake build` has no job limit, and
+the heaviest chunk theorems take several GB each, so running all 180 at once can exhaust RAM.
+
+Peak memory per chunk is estimated from `lean/Snaky/Gen/chunks.json` (written by cards2lean.py)
+as BASE + 2 KB per unit (the probe's cost model), and chunks are built in batches whose estimates
+sum to at most --budget GB (and at most --jobs chunks).  Then the rest of the library is built.
+
+usage: build-kernel [--budget GB] [--jobs N]
+"""
+import json
+import os
+import subprocess
+import sys
+import time
+
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LEAN = os.path.join(HERE, "lean")
+BASE_GB = 1.5
+GB_PER_UNIT = 2e-6
+
+
+def main():
+    opts = dict(zip(sys.argv[1::2], sys.argv[2::2]))
+    budget = float(opts.get("--budget", 24))
+    jobs = int(opts.get("--jobs", os.cpu_count() or 4))
+    chunks = json.load(open(os.path.join(LEAN, "Snaky", "Gen", "chunks.json")))
+    est = {c["chunk"]: BASE_GB + GB_PER_UNIT * c["units"] for c in chunks}
+    order = sorted(est, key=lambda k: -est[k])
+    batches, cur, used = [], [], 0.0
+    for k in order:
+        if cur and (used + est[k] > budget or len(cur) >= jobs):
+            batches.append(cur)
+            cur, used = [], 0.0
+        cur.append(k)
+        used += est[k]
+    batches.append(cur)
+    t0 = time.time()
+    subprocess.run(["lake", "build", "Snaky.Gen.Tree"], cwd=LEAN, check=True)
+    for b, ks in enumerate(batches):
+        print(f"[build-kernel] batch {b + 1}/{len(batches)}: {len(ks)} chunks, "
+              f"est {sum(est[k] for k in ks):.1f} GB, {time.time() - t0:.0f} s elapsed", flush=True)
+        subprocess.run(["lake", "build", *[f"Snaky.Gen.Chunk{k:03d}" for k in ks]],
+                       cwd=LEAN, check=True)
+    subprocess.run(["lake", "build"], cwd=LEAN, check=True)
+    print(f"[build-kernel] done in {time.time() - t0:.0f} s", flush=True)
+
+
+if __name__ == "__main__":
+    main()

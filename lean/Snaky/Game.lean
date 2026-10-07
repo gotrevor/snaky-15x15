@@ -61,4 +61,7 @@ def WinsOnSomeBoard : Prop := ∃ R C, BlackWins (placements R C snaky) (R * C) 
 Snaky's 8 orientations are pairwise distinct, so `placements` lists each placement once. -/
 example : (placements 9 9 snaky).length = 320 := by decide +kernel
 
+/-- Non-vacuity anchor: `8 · 11 · 14 = 1232` placements on 15 × 15 (same formula). -/
+theorem placements_15x15_length : (placements 15 15 snaky).length = 1232 := by decide +kernel
+
 end Snaky

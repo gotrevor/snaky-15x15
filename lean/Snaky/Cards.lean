@@ -12,8 +12,9 @@ placement, or every White reply `w ∈ S` (off `p :: A`), and a White move outsi
 is answered by a hint `(j, g)`: card `j` has a lower height, and under `g` its `A` lands inside
 `p :: A` and its `S` inside `S` minus `w`.  Hints are checked, never trusted.
 
-`Snaky.CardsSound` proves: if every card of a set passes `cardOK` and some card with `A = []`
-fits on the `R × C` board, then `BlackWins (placements R C snaky) (R * C) [] []`.  The parser
+The checker reads cards through a lookup `get : Nat → Option Card`.  `Snaky.CardsSound` proves:
+if every card `get` returns passes `cardOK get` and some card with `A = []` fits on the `R × C`
+board, then `BlackWins (placements R C snaky) (R * C) [] []`.  The parser
 `parseCards` is outside the trusted base: the theorem holds for whatever it returns.
 -/
 namespace Snaky
@@ -74,25 +75,26 @@ def wonPlane (B : List Pt) : Bool :=
       f.all fun u => B.contains (u.1 + t.1, u.2 + t.2)
 
 /-- Card `j` under `g`, of height below `h`, covers the position "Black owns `B`, region `R`". -/
-def hintOK (cs : Array Card) (h : Nat) (B : List Pt) (R : Pt → Bool) (hint : Hint) : Bool :=
-  match cs[hint.1]? with
+def hintOK (get : Nat → Option Card) (h : Nat) (B : List Pt) (R : Pt → Bool) (hint : Hint) :
+    Bool :=
+  match get hint.1 with
   | some c' => decide (c'.h < h) && hint.2.isOrient &&
       c'.A.all (fun a => B.contains (hint.2.app a)) && c'.S.all (fun s => R (hint.2.app s))
   | none => false
 
-def cardOK (cs : Array Card) (c : Card) : Bool :=
+def cardOK (get : Nat → Option Card) (c : Card) : Bool :=
   let B := c.p :: c.A
   decide (1 ≤ c.h) && c.S.contains c.p &&
   (wonPlane B ||
     ((match c.pass with
-      | some hn => hintOK cs c.h B (fun s => c.S.contains s) hn
+      | some hn => hintOK get c.h B (fun s => c.S.contains s) hn
       | none => false) &&
      c.S.all fun w => B.contains w ||
        match c.replies.lookup w with
-       | some hn => hintOK cs c.h B (fun s => c.S.contains s && s != w) hn
+       | some hn => hintOK get c.h B (fun s => c.S.contains s && s != w) hn
        | none => false))
 
-def allOK (cs : Array Card) : Bool := cs.toList.all (cardOK cs)
+def allOK (cs : Array Card) : Bool := cs.toList.all (cardOK (cs[·]?))
 
 def onBoard (R C : Nat) (q : Pt) : Prop := 0 ≤ q.1 ∧ q.1 < C ∧ 0 ≤ q.2 ∧ q.2 < R
 
@@ -101,11 +103,27 @@ instance (R C : Nat) (q : Pt) : Decidable (onBoard R C q) := by
 
 /-- The root: card `i` has `A = []`, fits on the board under `g`, and `2 h ≤ R C` (enough free
 cells for both players throughout). -/
-def rootOK (cs : Array Card) (R C : Nat) (i : Nat) (g : Xf) : Bool :=
-  match cs[i]? with
+def rootOK (get : Nat → Option Card) (R C : Nat) (i : Nat) (g : Xf) : Bool :=
+  match get i with
   | some c => c.A.isEmpty && g.isOrient && c.S.all (fun s => decide (onBoard R C (g.app s))) &&
       decide (2 * c.h ≤ R * C)
   | none => false
+
+/-! ## Lookup trees (the kernel-checked data path) -/
+
+/-- A card lookup the kernel can evaluate cheaply (an `Array` literal is a list underneath, so
+`cs[j]?` walks it).  `leaf i c` holds card `i`; `node m l r` sends indices below `m` left. -/
+inductive CTree where
+  | leaf (i : Nat) (c : Card)
+  | node (m : Nat) (l r : CTree)
+
+def CTree.get : CTree → Nat → Option Card
+  | .leaf i c, j => if j = i then some c else none
+  | .node m l r, j => if j < m then l.get j else r.get j
+
+def CTree.all (p : Card → Bool) : CTree → Bool
+  | .leaf _ c => p c
+  | .node _ l r => l.all p && r.all p
 
 /-! ## Parser (untrusted) -/
 
@@ -204,6 +222,6 @@ def parseCards (s : String) : CardSet := Id.run do
 
 /-- The whole check: every card justified and the root fits on the board. -/
 def CardSet.ok (cs : CardSet) : Bool :=
-  allOK cs.cards && rootOK cs.cards cs.rows cs.cols cs.root cs.rootXf
+  allOK cs.cards && rootOK (cs.cards[·]?) cs.rows cs.cols cs.root cs.rootXf
 
 end Snaky

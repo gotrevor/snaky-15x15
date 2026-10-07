@@ -3,7 +3,7 @@ import Snaky.Cards
 /-!
 # Soundness of the card checker
 
-`cards_sound`: if `allOK cs` and `rootOK cs R C i g`, then Black wins the empty `R × C` board.
+`cards_sound`: if every card `get` returns passes `cardOK get` and `rootOK get R C i g`, then Black wins the empty `R × C` board.
 
 Invariant for card `c` placed by `g` at position `(B, W)` (Black to move):
 * every cell of `g(A)` is on the board and Black's;
@@ -199,9 +199,9 @@ theorem won_image {R C : Nat} {B : List Pt} (hw : wonPlane B = true) {g : Xf}
 
 /-! ## Unpacking the checker -/
 
-theorem hintOK_spec {cs : Array Card} {h : Nat} {B : List Pt} {Rg : Pt → Bool} {hn : Hint}
-    (hok : hintOK cs h B Rg hn = true) :
-    ∃ c', cs[hn.1]? = some c' ∧ c'.h < h ∧ hn.2.isOrient = true ∧
+theorem hintOK_spec {get : Nat → Option Card} {h : Nat} {B : List Pt} {Rg : Pt → Bool}
+    {hn : Hint} (hok : hintOK get h B Rg hn = true) :
+    ∃ c', get hn.1 = some c' ∧ c'.h < h ∧ hn.2.isOrient = true ∧
       (∀ a ∈ c'.A, hn.2.app a ∈ B) ∧ ∀ s ∈ c'.S, Rg (hn.2.app s) = true := by
   unfold hintOK at hok
   split at hok
@@ -211,13 +211,32 @@ theorem hintOK_spec {cs : Array Card} {h : Nat} {B : List Pt} {Rg : Pt → Bool}
     exact ⟨c', hc', hok.1.1.1, hok.1.1.2, hok.1.2, hok.2⟩
   · simp at hok
 
-theorem allOK_spec {cs : Array Card} (hall : allOK cs = true) {j : Nat} {c : Card}
-    (hj : cs[j]? = some c) : cardOK cs c = true := by
+theorem allOK_spec {cs : Array Card} (hall : allOK cs = true) :
+    ∀ (j : Nat) c, cs[j]? = some c → cardOK (cs[·]?) c = true := by
+  intro j c hj
   unfold allOK at hall
   rw [List.all_eq_true] at hall
   apply hall
   obtain ⟨hlt, rfl⟩ := Array.getElem?_eq_some_iff.1 hj
   exact Array.getElem_mem_toList hlt
+
+theorem CTree.all_node {p : Card → Bool} {m : Nat} {l r : CTree} (hl : l.all p = true)
+    (hr : r.all p = true) : (CTree.node m l r).all p = true := by
+  simp [CTree.all, hl, hr]
+
+theorem CTree.all_get {p : Card → Bool} :
+    ∀ {t : CTree}, t.all p = true → ∀ j c, t.get j = some c → p c = true
+  | .leaf i c', h, j, c, hj => by
+    simp only [CTree.get] at hj
+    split at hj
+    · cases hj; exact h
+    · cases hj
+  | .node m l r, h, j, c, hj => by
+    simp only [CTree.all, Bool.and_eq_true] at h
+    simp only [CTree.get] at hj
+    split at hj
+    · exact CTree.all_get h.1 j c hj
+    · exact CTree.all_get h.2 j c hj
 
 /-! ## The induction -/
 
@@ -227,20 +246,21 @@ def Placed (R C : Nat) (c : Card) (g : Xf) (B W : List Nat) : Prop :=
   (∀ s ∈ c.S, onBoard R C (g.app s) ∧ idx C (g.app s) ∉ W) ∧
   (B ++ W).length + 2 * c.h ≤ R * C
 
-theorem sound_aux {cs : Array Card} (hall : allOK cs = true) (R C : Nat) :
-    ∀ n, ∀ c : Card, (∃ j : Nat, cs[j]? = some c) → c.h ≤ n → ∀ g : Xf, g.isOrient = true →
+theorem sound_aux {get : Nat → Option Card}
+    (hall : ∀ j c, get j = some c → cardOK get c = true) (R C : Nat) :
+    ∀ n, ∀ c : Card, (∃ j : Nat, get j = some c) → c.h ≤ n → ∀ g : Xf, g.isOrient = true →
       ∀ B W, Placed R C c g B W → BlackWins (placements R C snaky) (R * C) B W := by
   intro n
   induction n with
   | zero =>
     intro c ⟨j, hj⟩ hn
-    have hok := allOK_spec hall hj
+    have hok := hall _ _ hj
     unfold cardOK at hok
     simp only [Bool.and_eq_true, decide_eq_true_eq] at hok
     omega
   | succ n ih =>
     intro c ⟨j, hj⟩ hn g hg B W ⟨hAinv, hSinv, hlen⟩
-    have hok := allOK_spec hall hj
+    have hok := hall _ _ hj
     unfold cardOK at hok
     simp only [Bool.and_eq_true, decide_eq_true_eq, Bool.or_eq_true, List.contains_iff_mem]
       at hok
@@ -273,7 +293,7 @@ theorem sound_aux {cs : Array Card} (hall : allOK cs = true) (R C : Nat) :
       -- one White move answered by hint `hn` with region test `Rg`
       have step : ∀ (hn : Hint) (Rg : Pt → Bool),
           (∀ s, Rg s = true → s ∈ c.S ∧ idx C (g.app s) ≠ w) →
-          hintOK cs c.h (c.p :: c.A) Rg hn = true →
+          hintOK get c.h (c.p :: c.A) Rg hn = true →
           BlackWins (placements R C snaky) (R * C) (b :: B) (w :: W) := by
         intro hn Rg hRg hhint
         obtain ⟨c', hj', hlt', hor, hA', hS'⟩ := hintOK_spec hhint
@@ -313,8 +333,8 @@ theorem sound_aux {cs : Array Card} (hall : allOK cs = true) (R C : Nat) :
         · simp at hpass
 
 /-- **Soundness of the card checker.** -/
-theorem cards_sound {cs : Array Card} {R C i : Nat} {g : Xf} (hall : allOK cs = true)
-    (hroot : rootOK cs R C i g = true) : BlackWins (placements R C snaky) (R * C) [] [] := by
+theorem cards_sound {get : Nat → Option Card} {R C i : Nat} {g : Xf}
+    (hall : ∀ j c, get j = some c → cardOK get c = true) (hroot : rootOK get R C i g = true) : BlackWins (placements R C snaky) (R * C) [] [] := by
   unfold rootOK at hroot
   split at hroot
   · rename_i c hc
@@ -331,6 +351,11 @@ theorem CardSet.sound {s : CardSet} (h : s.ok = true) :
     BlackWins (placements s.rows s.cols snaky) (s.rows * s.cols) [] [] := by
   unfold CardSet.ok at h
   rw [Bool.and_eq_true] at h
-  exact cards_sound h.1 h.2
+  exact cards_sound (allOK_spec h.1) h.2
+
+/-- The kernel-checked form: the cards live in a lookup tree. -/
+theorem CTree.sound {t : CTree} {R C i : Nat} {g : Xf} (hall : t.all (cardOK t.get) = true)
+    (hroot : rootOK t.get R C i g = true) : BlackWins (placements R C snaky) (R * C) [] [] :=
+  cards_sound (CTree.all_get hall) hroot
 
 end Snaky
