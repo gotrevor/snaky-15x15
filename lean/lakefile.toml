@@ -3,3 +3,7 @@ defaultTargets = ["Snaky"]
 
 [[lean_lib]]
 name = "Snaky"
+
+[[lean_exe]]
+name = "cardcheck"
+root = "CardCheck"

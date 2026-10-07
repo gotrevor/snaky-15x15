@@ -11,7 +11,7 @@ strategy-tree certificate checked by an independent checker:
 
 - `cert/snaky-15x15.tar.gz`: the certificate (1,750 JSON files, sha256 in `verify`)
 - `checker/check.py`: the checker; `tests/`: its tests, including rejection of corrupted certificates
-- `lean/`: the game and the statement `Snaky.snaky_wins_15x15` (proof pending: `sorry`)
+- `lean/`: the game and the theorem `Snaky.snaky_wins_15x15`, proved by a card checker that is proved sound and run on `cert/snaky-15x15-cards.txt` (`cd lean && lake build`, about 10 s)
 - `docs/notes/snaky.md`: context, method, and what remains open
 
 Apache-2.0.

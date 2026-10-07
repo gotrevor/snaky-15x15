@@ -1,5 +1,25 @@
 # Plan: prove `snaky_wins_15x15` in Lean by a verified checker
 
+## Status 2026-10-07: done, by the card route
+
+`Snaky.snaky_wins_15x15` is proved (no `sorry`; axioms `propext`, `Classical.choice`, `Quot.sound`
+plus the `native_decide` evaluation of the checker).  Decision: **cards, not the tree checker.**  The
+card soundness lemma needs no White-monotonicity (R5) or symmetry-invariance (R3) of `BlackWins`:
+both are absorbed into the card calculus (a region is exactly what White may not touch; symmetries
+act on plane coordinates, never on `BlackWins`).  Black-monotonicity turned out to be needed only in a
+weak form (an occupied card move is replaced by any free cell), handled inside the induction with a
+free-cell budget `|B| + |W| + 2h ≤ R C`.
+
+- `lean/Snaky/Cards.lean`: checker `cardOK`/`rootOK`/`CardSet.ok`, untrusted parser `parseCards`.
+- `lean/Snaky/CardsSound.lean`: `CardSet.sound` (about 330 lines, no Mathlib).
+- `lean/Snaky/CardData.lean`: `include_str` of `cert/snaky-15x15-cards.txt` (3.3 MB text,
+  `tools/cards2txt.py` from the JSON card set).
+- `lean/CardCheck.lean`: `cardcheck` executable, same checker; `tests/test_lean_cards.py`.
+- Build: `lake build` about 10 s; the `native_decide` itself well under a second.
+
+The tree-checker plan below is kept as the road not taken.
+
+
 Goal: replace the `sorry` in `lean/Snaky/Result.lean` with
 
 1. `check : Cert → Bool`, a Lean port of `checker/check.py` restricted to Black certificates (claim `"black"`), and

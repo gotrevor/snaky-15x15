@@ -51,7 +51,13 @@ The tests (`tests/test_checker.py`) show it rejects certificates with a dropped 
 theorem snaky_wins_15x15 : BlackWins (placements 15 15 snaky) (15 * 15) [] []
 ```
 
-currently proved by `sorry`.  The planned proof ports the checker to Lean, proves it sound against `BlackWins` (the zone rule needs a monotonicity lemma: a Black win survives extra White stones outside the winning subtree's support; the symmetry rule needs invariance of `BlackWins` under board symmetries), and runs it on the certificate.
+with no `sorry`.  The proof does not replay the tree.  The tree certificate is first compressed (by the search repository; the compression is untrusted) into a set of 8,671 *cards*, `cert/snaky-15x15-cards.txt`.  A card (A, S, p, h) says: Black owns the cells A, White owns nothing in the region S, Black to move plays p and wins within h moves.  Cards apply under the 8 board symmetries plus translation.  A card is justified when A + p already holds a placement, or every White reply in S, and a White move outside S, leads to a position covered by a card of lower height.  This is the same kind of composition rule as OpenAI's 728-card strategy, with many more cards because they come from a search rather than a design.
+
+- `lean/Snaky/Cards.lean`: the card checker (`cardOK`, `rootOK`) and an untrusted parser for the text format.  Every reply carries a hint (card index and map), which the checker verifies; there is no search.
+- `lean/Snaky/CardsSound.lean`: `CardSet.sound`, any accepted card set gives `BlackWins` on the empty board.  It uses induction on the height, with the invariant "Black owns the image of A, White owns nothing in the image of S, and |B| + |W| + 2h ≤ R C" (so both players always have a free cell).  If the card's move is already Black's, Black plays any free cell; an extra Black stone never hurts.  The won case maps the plane placement into `placements` through the symmetries.  Axioms: `propext`, `Classical.choice`, `Quot.sound`.
+- `lean/Snaky/Result.lean`: evaluates the checker on the card set by `native_decide` (about a second), which adds the compiler to the trusted base.
+
+`cd lean && lake build cardcheck && .lake/build/bin/cardcheck ../cert/snaky-15x15-cards.txt` runs the same checker outside the proof (`VALID cards=8671 root=0 board=15x15`); `tests/test_lean_cards.py` shows it rejects a wrong hint, a missing reply or pass hint, a height that does not drop, an enlarged required set, an unwinnable finishing card, a root with too little room, and a corrupted card in the real set.
 
 ## Open
 
@@ -63,5 +69,5 @@ currently proved by `sorry`.  The planned proof ports the checker to Lean, prove
 ```sh
 ./verify                                            # about 12 minutes
 uv run --with pytest pytest -q tests                # checker teeth tests; SNAKY_FULL=1 adds the full check
-cd lean && lake build                               # the statement (sorry)
+cd lean && lake build                               # the Lean proof (about 10 seconds)
 ```
