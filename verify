@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+"""Verify the 15x15 Snaky certificate: check the archive's sha256, unpack it into build/, and run
+the independent checker on the root certificate (about 12 minutes, one core, stdlib only)."""
+import hashlib
+import os
+import subprocess
+import sys
+import tarfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ARCHIVE = os.path.join(HERE, "cert", "snaky-15x15.tar.gz")
+ARCHIVE_SHA256 = "b511b2ac42a4cb47ccac00bd07be552dbee4e4b1d44b553190cfaa37f4057e9c"
+ROOT = "snaky-15x15/root/snaky-15x15.json"
+ROOT_SHA256 = "e9cd50f338b0e1b71d469bc32ccd41207907b9649c17da88dd8a85b5e4997243"
+
+
+def sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def main():
+    got = sha256(ARCHIVE)
+    if got != ARCHIVE_SHA256:
+        sys.exit(f"archive sha256 mismatch: {got}")
+    build = os.path.join(HERE, "build")
+    root = os.path.join(build, ROOT)
+    if not os.path.exists(root):
+        with tarfile.open(ARCHIVE) as tf:
+            tf.extractall(build, filter="data")
+    if sha256(root) != ROOT_SHA256:
+        sys.exit("root certificate sha256 mismatch")
+    print(f"archive and root certificate hashes match; checking {ROOT} ...", flush=True)
+    rc = subprocess.call([sys.executable, os.path.join(HERE, "checker", "check.py"), root])
+    sys.exit(rc)
+
+
+if __name__ == "__main__":
+    main()
