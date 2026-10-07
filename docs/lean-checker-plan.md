@@ -1,0 +1,44 @@
+# Plan: prove `snaky_wins_15x15` in Lean by a verified checker
+
+Goal: replace the `sorry` in `lean/Snaky/Result.lean` with
+
+1. `check : Cert → Bool`, a Lean port of `checker/check.py` restricted to Black certificates (claim `"black"`), and
+2. a **one-time soundness theorem** `check c = true → BlackWins (placements R C shape) (R * C) c.black c.white`, generic in the certificate, then
+3. evaluation of `check` on the certificate data (`native_decide` is fine; this is not a publish-tier repo).
+
+No per-position hand proofs: the certificate is data.
+
+## The game (already in `lean/Snaky/Game.lean`, no Mathlib)
+
+`BlackWins P N B W` / `WhiteToMoveLoses P N B W`, mutual inductive: Black moves to a free cell; after it, either Black owns a placement, or a free cell exists and every White reply leaves `BlackWins`.  Keep these definitions unchanged; they are the statement's meaning.
+
+## Rules to port (see the docstring of `checker/check.py`)
+
+- Black node: `play b` (b free) then a White node; or `cite` another file whose start position must equal the current one (data: the file list; hashes are irrelevant inside Lean if the data is embedded directly).
+- White node `won p`: p is a placement owned by Black.
+- White node `zone Z, replies, pass`: every free cell in Z has a reply child or is covered by symmetry (R3: a board symmetry g fixing the normalized position maps it to a cell with a child); the pass child (if present) proves a Black win with White having passed; Z must contain supp(pass) ∩ free (R5); without a pass child Z must contain all free relevant cells.
+
+## Lemmas the soundness proof needs
+
+1. **Monotonicity in White (R5, the substantive one).**  Let T be a certificate subtree from Q = (B, W) and S = supp(T).  For any W' with W' ∩ S = ∅ (extra White stones off the support), T is still a win from (B, W ∪ W').  Prove by induction on T together with the checker's acceptance.  This is what makes a White move outside the zone equivalent to a pass.
+2. **Monotonicity in Black** (possibly unneeded; check while proving).  An extra Black stone never hurts.
+3. **Symmetry invariance (R3).**  `BlackWins` is invariant under board symmetries (`placements` is closed under them).
+4. **Citations compose**: a cited file checked from the same position contributes its `BlackWins`.
+5. **Relevance (R2)** is for White certificates only and can be skipped.
+
+## Data engineering (the main non-proof risk)
+
+The certificate is 1,750 JSON files, 2.7M stored nodes (93 MB JSON, 12 MB tar.gz), and the Python check visits 145.9M node-positions in ~12 min.  JSON as a Lean literal will not elaborate.  Options to evaluate first, smallest experiment first:
+- a compact binary encoding read through `include_bytes`-style embedding if available in the pinned toolchain (verify it exists before planning around it);
+- generated Lean source of `ByteArray`/`Array UInt32` chunks split across many files;
+- shrinking the data first: a parallel thread in the search repo is compressing the certificate into reusable cards (`~/src/snaky/docs/templates-report.md` when it lands); a card set may be far smaller.
+Performance: the Lean checker should memoize (position, node) like the Python one; compiled Lean should match or beat Python.
+
+## Suggested order
+
+1. Port `check` for small certificates and run it on `tests/fixtures/*` (agreement with Python, including the corrupted fixtures rejecting).
+2. State and prove the lemmas on small generic structures; soundness theorem.
+3. Data path on the fixture `tests/fixtures/split/` (cites), then the full certificate.
+4. Replace `sorry`.
+
+Record progress as Lean statements (a lemma stated with `sorry` is progress); keep this plan current.
