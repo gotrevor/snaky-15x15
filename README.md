@@ -1,7 +1,8 @@
 # Snaky is a first-player win on 15 × 15
 
 In Harary's achievement game for the Snaky hexomino (weak / maker-breaker version), the first
-player wins on the empty 15 × 15 board, and hence on the plane.  The evidence is an explicit
+player wins on the empty 15 × 15 board, the board size in Harary's conjecture (OpenAI proved the
+plane win in Lean in 2026; see `docs/notes/snaky.md`).  The evidence is an explicit
 strategy-tree certificate checked by an independent checker:
 
 ```sh
