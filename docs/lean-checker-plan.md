@@ -24,9 +24,9 @@ free-cell budget `|B| + |W| + 2h ≤ R C`.
   in its own process).  Measured 2026-10-07 on the laptop: 194 modules, 1,389 s summed, largest
   4.7 GB (an ordinary 1.5M-unit chunk).  The first version used `native_decide` (10 s build);
   replaced so a comparator run with the standard axiom whitelist passes.
-- CI (`.github/workflows/ci.yml`): `build` (build-kernel, axioms, tests) on PRs and main;
-  `comparator` (Lean kernel + nanoda) on main and by dispatch only, since it re-checks the whole
-  proof in one process.  Runner probe 2026-10-07 (branch `wip/kernel-ci`): private-repo runners have
+- CI (`.github/workflows/ci.yml`): one job, `build`: build-kernel, axioms, tests; then, on main and
+  by dispatch only (not PRs), comparator (Lean kernel + nanoda), which re-checks the whole proof in
+  one process from the oleans the same job built.  Runner probe 2026-10-07 (branch `wip/kernel-ci`): private-repo runners have
   2 CPUs and 8 GB (7.8 GiB seen, plus 3 GiB swap), public ones 4 CPUs and 16 GB (GitHub docs).  On
   the 8 GB runner a 9 GB theorem (card 0 whole) thrashed swap for 9.6 min against 30 s on the
   laptop; split into pieces of at most 5 GB it took 69 s.  Comparator with nanoda passed on card 0
