@@ -2,6 +2,18 @@
 
 [ Written by Claude (Anthropic) at Trevor Morris's direction; the search, the certificate and this note are machine-produced, and the certificate is the evidence. ]
 
+## OpenAI's result, and what this adds
+
+OpenAI's preprint *Snaky in 21 Maker moves* (2026-09-25, problem 187 in [`github.com/openai/math`](https://github.com/openai/math)) settled the open question: the first player (Maker) wins Snaky on the empty infinite board, within 21 of its own moves.  Their Lean 4 proof covers the infinite board.  The paper also shows (Corollary 6) that the same bound holds on a 17 × 17 board, because Maker's claims stay inside a fixed 251-cell region; that finite-board statement is proved on paper, not in Lean.
+
+This repository adds three things:
+
+- **A smaller board, 15 × 15.**  This is the board size in Harary's conjecture (see Context below), two rows and columns smaller than OpenAI's 17 × 17.  A win on 15 × 15 implies the win on the plane, so this is also a second, separately checked proof that Snaky wins on the plane (without OpenAI's 21-move bound).
+- **A finite-board Lean proof.**  `snaky_wins_15x15` is stated on the 15 × 15 board and checked by the Lean kernel, with no `native_decide` and only the standard axioms.
+- **A different kind of evidence.**  The win is also an explicit game tree (1,750 files) accepted by a stand-alone checker of about 330 lines of Python that shares no code with the search.
+
+OpenAI's work also helped directly: their 21-move strategy supplied the Black moves that closed the last three positions our search could not (see "The hardest case" below).  The proofs of those positions are this repository's own trees.
+
 ## The result
 
 In the weak (maker-breaker) achievement game for Snaky, the hexomino {(0,0),(1,0),(2,0),(3,0),(3,1),(4,1)}, the first player (Maker, "Black") wins on the empty 15 × 15 board.  Black claims cells, White claims cells to block, and Black wins on owning all six cells of some copy of Snaky (any rotation or reflection, inside the board).
@@ -18,10 +30,9 @@ Root certificate sha256: `e9cd50f338b0e1b71d469bc32ccd41207907b9649c17da88dd8a85
 
 ## Context
 
-- Harary asked which polyominoes are "winners" in this game; Snaky is the one hexomino whose status stayed open.  Harary conjectured that Snaky wins on a 15 × 15 board (S. Boucher, PhD thesis, UQAM 2026, §7, citing Beck, *Combinatorial Games: Tic-Tac-Toe Theory*, 2008, where the conjecture is traced to a colleague of Harary who won every game on that board as first player).  Boucher's thesis still lists Snaky's status as open.
+- Harary asked which polyominoes are "winners" in this game; Snaky is the one hexomino whose status stayed open.  Harary conjectured that Snaky wins on a 15 × 15 board (S. Boucher, PhD thesis, UQAM 2026, §7, citing Beck, *Combinatorial Games: Tic-Tac-Toe Theory*, 2008, where the conjecture is traced to a colleague of Harary who won every game on that board as first player).  Boucher's thesis (January 2026) lists Snaky's status as open.
 - Halupczok and Schlage-Puchta, *Achieving Snaky* (Integers 7, 2007), proved that Snaky loses on 8 × 8, wins in three dimensions, and wins on the plane with one extra Black stone (handicap 1).
-- OpenAI, *Snaky in 21 Maker moves* (preprint dated 2026-09-25, `github.com/openai/math`), gives a Maker strategy winning within 21 Maker moves on the plane, proved in Lean 4 for the infinite board; the paper also derives a win on 17 × 17.
-- This certificate gives a win on 15 × 15, the board size in Harary's conjecture and two rows and columns smaller than the 17 × 17 board in OpenAI's paper, checked as an explicit game tree.
+- OpenAI, *Snaky in 21 Maker moves* (2026): Maker wins on the plane within 21 moves, and on 17 × 17 (see the section above).
 
 ## How the certificate is built
 
