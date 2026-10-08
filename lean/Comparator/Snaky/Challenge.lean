@@ -4,7 +4,9 @@
 Imports nothing.  The definitions below are the project's own (`Snaky/Game.lean`), written out in
 full under their real names, so they can be read here on their own terms: the board, Snaky's
 placements, and the maker-breaker game `BlackWins`.  `snaky_wins_15x15` is the claim;
-`placements_15x15_length` is a proved non-vacuity anchor for `placements`.
+`placements_15x15_length` is a proved non-vacuity anchor for `placements`, and the three
+falsification controls show `BlackWins` is false where it must be (proved in
+`Snaky/Controls.lean`, checked here by the comparator).
 -/
 set_option warningAsError false
 
@@ -59,6 +61,25 @@ def WinsOnSomeBoard : Prop := ∃ R C, BlackWins (placements R C snaky) (R * C) 
 
 /-- Non-vacuity anchor: `8 · 11 · 14 = 1232` placements on 15 × 15 (same formula). -/
 theorem placements_15x15_length : (placements 15 15 snaky).length = 1232 := by decide +kernel
+
+/-- The horizontal domino. -/
+def domino : List (Int × Int) := [(0, 0), (1, 0)]
+
+/-- The straight tromino. -/
+def tromino : List (Int × Int) := [(0, 0), (1, 0), (2, 0)]
+
+/-- Falsification control: with no placements Black never wins, so a full board is a draw, not a
+Black win (the draw guard `hfree` is load-bearing). -/
+theorem no_placements_no_win (N : Nat) : ¬ BlackWins [] N [] [] := by
+  sorry
+
+/-- Positive control: on a 1 × 3 board Black forces a domino by taking the middle cell. -/
+theorem domino_wins_1x3 : BlackWins (placements 1 3 domino) 3 [] [] := by
+  sorry
+
+/-- Negative control: on a 1 × 3 board Black cannot force a straight tromino. -/
+theorem tromino_loses_1x3 : ¬ BlackWins (placements 1 3 tromino) 3 [] [] := by
+  sorry
 
 /-- **Snaky is a first-player win on 15 × 15.** -/
 theorem snaky_wins_15x15 : BlackWins (placements 15 15 snaky) (15 * 15) [] [] := by

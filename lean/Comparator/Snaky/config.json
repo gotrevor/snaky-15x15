@@ -1,7 +1,8 @@
 {
   "challenge_module": "Comparator.Snaky.Challenge",
   "solution_module": "Comparator.Snaky.Solution",
-  "theorem_names": ["Snaky.snaky_wins_15x15", "Snaky.placements_15x15_length"],
+  "theorem_names": ["Snaky.snaky_wins_15x15", "Snaky.placements_15x15_length",
+                    "Snaky.no_placements_no_win", "Snaky.domino_wins_1x3", "Snaky.tromino_loses_1x3"],
   "permitted_axioms": ["propext", "Quot.sound", "Classical.choice"],
   "enable_nanoda": true
 }
