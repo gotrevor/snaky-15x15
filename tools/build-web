@@ -7,15 +7,32 @@ The 9 x 9 page (9x9.html) reads a snapshot of the search from 9x9/: progress.jso
 certificate per proved first move.  The search runs elsewhere and its exporter writes that
 directory; pass it with --nine.  Without it the page says no snapshot is published.
 
+Every script, stylesheet and module import is referenced as NAME?v=<sha256 prefix of its built
+content>: the host caches .js and .css for hours but revalidates the HTML, so a stale script
+alongside a fresh page (the phone saw the new 9 x 9 page run the old script) cannot happen.
+
 usage: tools/build-web [OUT_DIR] [--nine SNAPSHOT_DIR]      (default OUT_DIR build/web)
 """
 import argparse
+import hashlib
 import json
 import os
+import re
 import shutil
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FILES = ["index.html", "style.css", "app.js", "engine.js", "9x9.html", "nine-app.js", "nine.js"]
+# Versioned in this order, so a module's stamp covers the stamps of what it imports.
+ASSETS = ["style.css", "engine.js", "nine.js", "app.js", "nine-app.js"]
+REF = re.compile(r"""(["'])(\./)?([\w.-]+\.(?:js|css))\1""")
+
+
+def stamp(text, versions):
+    """Rewrite references to known assets as NAME?v=HASH."""
+    def sub(m):
+        q, dot, name = m.group(1), m.group(2) or "", m.group(3)
+        return f"{q}{dot}{name}?v={versions[name]}{q}" if name in versions else m.group(0)
+    return REF.sub(sub, text)
 
 
 def main():
@@ -25,8 +42,13 @@ def main():
     args = ap.parse_args()
     out = args.out
     os.makedirs(out, exist_ok=True)
-    for f in FILES:
-        shutil.copyfile(os.path.join(HERE, "web", f), os.path.join(out, f))
+    versions = {}
+    for f in ASSETS + [f for f in FILES if f not in ASSETS]:
+        text = stamp(open(os.path.join(HERE, "web", f), encoding="utf-8").read(), versions)
+        if f in ASSETS:
+            versions[f] = hashlib.sha256(text.encode()).hexdigest()[:10]
+        with open(os.path.join(out, f), "w", encoding="utf-8") as fh:
+            fh.write(text)
     shutil.copyfile(os.path.join(HERE, "cert", "snaky-15x15-cards.txt"), os.path.join(out, "cards.txt"))
     wrote = FILES + ["cards.txt"]
     if args.nine:
