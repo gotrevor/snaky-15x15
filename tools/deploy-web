@@ -1,0 +1,43 @@
+#!/usr/bin/env -S uv run --quiet python3
+"""Build and deploy snaky.gotrevor.org from this checkout, only if it IS origin/main.
+
+A Pages deploy replaces the whole site, so deploying from a stale branch silently removes
+whatever main has added since (2026-10-08: a deploy from a pre-merge 9 x 9 branch, minutes after
+the 17 x 17 page went live, took the page and its link down).  This script fetches, then
+refuses unless the tree is clean and HEAD equals origin/main.
+
+usage: tools/deploy-web --nine SNAPSHOT_DIR      (e.g. ~/src/snaky/probes/results/web9)
+"""
+import argparse
+import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def git(*args):
+    return subprocess.run(["git", "-C", HERE, *args], check=True, capture_output=True, text=True).stdout.strip()
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--nine", required=True, help="9 x 9 snapshot directory (progress.json + certs)")
+    args = ap.parse_args()
+    git("fetch", "-q", "origin", "main")
+    head, main_ = git("rev-parse", "HEAD"), git("rev-parse", "origin/main")
+    if head != main_:
+        sys.exit(f"refusing: HEAD {head[:7]} is not origin/main {main_[:7]}; deploy from a checkout of main")
+    dirty = [l for l in git("status", "--porcelain").splitlines() if not l.endswith((".wrangler/", "build/"))]
+    if dirty:
+        sys.exit("refusing: uncommitted changes:\n" + "\n".join(dirty))
+    out = os.path.join(HERE, "build", "web")
+    subprocess.run([sys.executable, os.path.join(HERE, "tools", "build-web"), out, "--nine", args.nine], check=True)
+    account = subprocess.run(["cf", "account-id"], check=True, capture_output=True, text=True).stdout.strip()
+    subprocess.run(["cf", "exec", "--", "wrangler", "pages", "deploy", out, "--project-name", "snaky",
+                    "--branch", "main", "--commit-hash", head],
+                   check=True, env={**os.environ, "CLOUDFLARE_ACCOUNT_ID": account})
+
+
+if __name__ == "__main__":
+    main()
