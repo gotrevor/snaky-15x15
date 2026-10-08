@@ -3,7 +3,7 @@
 `cards-17x17.txt` is Nándor Sieben's proof sequence for Snaky
 ([nandorsieben/Snaky](https://github.com/nandorsieben/Snaky) at `a0a36dd`,
 `proof-sequence-20.html.gz`, sha256 `0485b874…dc082d55`), converted to the card text format by
-`tools/sieben2cards.py`.  The 17 × 17 page (`web/17x17.html`) plays it.
+`tools/sieben2cards.py`.  The 17 × 17 page (`web/17x17.html`) plays it.  Published with his permission (email to Trevor Morris, 2026-10-08).
 
 - His HTML: 1,510 situations, each "Maker's stones, Breaker to move", every region cell labelled
   with the situation after Breaker plays there and Maker answers.  The root has one Maker stone
