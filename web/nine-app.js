@@ -79,7 +79,7 @@ function renderSummary() {
   }
   const when = new Date(snap.generated);
   $('stamp').textContent = `Snapshot ${when.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}` +
-    ` · ${running.length} searches running · ${fmtH(cpu)} of search so far`;
+    ` · ${running.length} search${running.length === 1 ? '' : 'es'} running · ${fmtH(cpu)} of search so far`;
 }
 
 function renderDetail() {
@@ -95,10 +95,20 @@ function renderDetail() {
     lines.push(`<p><button id="play-this">Play Black from ${rec.cell}</button></p>`);
   } else {
     const ex = rec.exhausted ? `Searched to depth ${rec.exhausted} with no proof yet.` : 'Not searched yet.';
-    const run = rec.running ? `  Running now at depth ${rec.running.depth || '?'} (this run ${fmtH(rec.running.elapsed)}).` : '';
+    const run = rec.running ? `  Running now at depth ${rec.running.depth || '?'}` +
+      (rec.running.elapsed ? ` (this run ${fmtH(rec.running.elapsed)}).` : '.') : '';
     lines.push(`<p><b>Open.</b>  ${ex}${run}  ${fmtH(rec.cpu_seconds)} of search finished so far.</p>`);
   }
-  lines.push(chart(rec));
+  if (rec.split) {
+    // One search per White reply: the first move is proved once any reply is.
+    lines.push('<p>Searched as one run per White reply; any reply proved proves ' + rec.cell + '.</p>');
+    lines.push('<table class="split"><tr><th>White</th><th>status</th><th>searched to</th><th>time</th></tr>' +
+      rec.split.map((r) => `<tr><td>${r.reply}</td><td class="xs-${r.status === 'proved' ? 'proved' : r.status === 'searching' ? 'searching' : r.status === 'open' ? 'open' : 'skipped'}">${r.status}</td>` +
+        `<td>${r.depth ? `proved at ${r.depth}` : r.exhausted ? `depth ${r.exhausted}` : '-'}</td><td>${fmtH(r.cpu_seconds)}</td></tr>`).join('') +
+      '</table>');
+  } else {
+    lines.push(chart(rec));
+  }
   box.innerHTML = lines.join('');
   const b = $('play-this');
   if (b) b.addEventListener('click', () => { setMode('play'); newGame([selected]); });
@@ -307,13 +317,15 @@ function describe() {
   setStatus(`Your move.  ${open}`, `White played ${label(N, last.cell)}, ${WHY[last.why] || last.why}.`);
 }
 
-// No disc for 'pending' (not reached yet): that is most of the board at a fresh node.
-const XSYM = { open: '✕', searching: '…', proved: '✓', pave: 'P', skipped: '–' };
+// No disc for 'pending' (not reached yet) or 'skipped' (not examined: an earlier move already
+// refuted this reply): together they are most of the board.
+const XSYM = { open: '✕', searching: '…', proved: '✓', pave: 'P' };
 
 function describeExplore() {
   const x = explore, rp = x.report;
   const rec = byRep.get(classOf[blacks[0]]);
-  const pass = x.nodes === rp.last ? `last complete pass, depth ${rp.last_iter}` : `depth-${rp.iter} pass, in progress`;
+  const pass = rp.split ? (x.nodes === rp.last ? 'last complete passes' : 'passes in progress')
+    : x.nodes === rp.last ? `last complete pass, depth ${rp.last_iter}` : `depth-${rp.iter} pass, in progress`;
   const when = rp.time ? new Date(rp.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '?';
   if (x.winner()) {
     setStatus('Black made a Snaky in this line.', 'Exploring only: you chose White\'s moves too, so this says nothing about the proof.');
@@ -336,7 +348,8 @@ function exploreText() {
   if (r.side === 'W') {
     // Names on the board, not in the search's frame (they differ after a mirrored move).
     const board = (c) => label(N, x.finv[parseLabel(N, c)]);
-    const list = Object.entries(r.cands || {}).map(([c, st]) => `${board(c)} ${st}`).join(', ');
+    const depth = (c) => (r.depths && r.depths[c] ? ` to depth ${r.depths[c]}` : '');
+    const list = Object.entries(r.cands || {}).map(([c, st]) => `${board(c)} ${st}${depth(c)}`).join(', ');
     return `White to move after ${prev}.  The search tries ${Object.keys(r.cands || {}).length} replies here (${list}).  Tap one to play it for White.${r.forced ? '  (Forced: Black threatens to win.)' : ''}`;
   }
   const parts = ['open', 'searching', 'proved', 'pave', 'pending', 'skipped'].map((st) => [st, count(st)]).filter(([, n]) => n);

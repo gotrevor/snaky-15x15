@@ -162,3 +162,6 @@ body.nine .board-wrap { max-width: min(680px, calc(100vh - 150px)); }
 .xs-searching { fill: var(--hot); color: var(--hot); }
 .xs-proved, .xs-pave { fill: var(--good); color: var(--good); }
 .xs-skipped { fill: #8a8377; color: #8a8377; }
+.split { border-collapse: collapse; font-size: 0.9rem; margin-top: 0.4rem; }
+.split th, .split td { padding: 0.1rem 0.6rem 0.1rem 0; text-align: left; }
+.split th { font-weight: 600; color: var(--muted); }

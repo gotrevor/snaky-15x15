@@ -59,7 +59,7 @@
         <li>Exploring an open first move: you play both sides, following the live search.</li>
         <li><b class="xs-open">✕</b> open: the search has no answer yet at this depth (an open sub-line)
           · <b class="xs-searching">…</b> being searched now · <b class="xs-proved">✓</b> proved deeper
-          · <b class="xs-pave">P</b> answered straight into a pairing · <b class="xs-skipped">–</b> skipped, an earlier move already refuted this reply.  Blank: not reached yet.  →: White's reply.</li>
+          · <b class="xs-pave">P</b> answered straight into a pairing.  Blank: not reached yet, or skipped because an earlier move already refuted this reply.  →: White's reply.</li>
         <li id="xpass-wrap" hidden><label>Show <select id="xpass">
           <option value="nodes">the pass in progress</option>
           <option value="last">the last complete pass</option></select></label></li>
@@ -86,7 +86,9 @@
     each one, a search looks for a tree of White replies whose every line ends in a <i>pairing</i>:
     disjoint pairs of empty cells such that every Snaky that could still fit contains one.  From
     there White simply answers each Black move with its partner.  A SAT solver finds the pairings,
-    and the search deepens one level at a time, trying 6 White replies at each step.  Every proof
+    and the search deepens one level at a time, trying up to 6 White replies at each step.  (Until
+    8 October 08:17 those 6 could include mirror images of one another, so depths reached before
+    then were searched with fewer distinct replies; e5 is now searched as one run per distinct reply.)  Every proof
     found is written out as a certificate and re-verified by an independent checker that shares no
     code with the search.  The checker also accepts two shortcuts: a Black move in no live Snaky
     needs no special answer, and a move that a symmetry of the position maps onto an answered one
