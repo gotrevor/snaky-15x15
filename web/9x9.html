@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snaky 9 × 9: the White proof, in progress</title>
+<meta name="description" content="A computer search is proving that White stops the Snaky hexomino on a 9 × 9 board. See which of Black's first moves are settled, and play Black against the proofs found so far.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="nine">
+<header>
+  <h1>Snaky 9 × 9 <span class="sub">the White proof, in progress</span></h1>
+  <nav class="repo"><a href="./">15 × 15: play White against Black's proof</a></nav>
+</header>
+
+<main>
+  <section class="board-wrap">
+    <svg id="board" role="grid" aria-label="9 by 9 board"></svg>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button id="tab-progress" role="tab" aria-selected="true">Progress</button>
+      <button id="tab-play" role="tab" aria-selected="false">Play Black</button>
+    </div>
+
+    <div id="progress-panel">
+      <div id="summary" class="summary">Loading the snapshot…</div>
+      <div id="bar" class="bar" aria-hidden="true"></div>
+      <div id="stamp" class="bound"></div>
+      <ul class="help legend">
+        <li><span class="key key-proved"></span> proved: White wins after this first move</li>
+        <li><span class="key key-running"></span> open, a search is running now</li>
+        <li><span class="key key-open"></span> open, no search running</li>
+      </ul>
+      <p class="help">The number on each first move is the depth: how many more Black moves White's
+        tree may take before every line ends in a pairing.  "≥ 16" means depths up to 15 were searched
+        without a proof.  Click a cell for its record.</p>
+      <div id="detail" class="detail"></div>
+    </div>
+
+    <div id="play-panel" hidden>
+      <div id="status" class="status" aria-live="polite"></div>
+      <div id="why" class="bound"></div>
+      <div class="buttons">
+        <button id="new">New game</button>
+        <button id="undo" title="Take back your last move">Take back</button>
+      </div>
+      <label class="toggle"><input type="checkbox" id="pairs" checked> Show White's pairing</label>
+      <p id="pairs-help" class="help">At a pairing, every Snaky that could still fit contains one
+        linked pair.  Take one end and White takes the other.</p>
+      <ol id="moves" class="moves"></ol>
+    </div>
+  </aside>
+</main>
+
+<section class="about">
+  <h2>What is being proved</h2>
+  <p>
+    Black and White take turns claiming cells; Black moves first.  Black wins by owning all six
+    cells of a <b>Snaky</b> (any rotation or reflection), and White wins by stopping that.  On
+    15 × 15 Black wins (<a href="./">play it</a>).  Halupczok and Schlage-Puchta showed White wins on
+    8 × 8 (2007), and our search has a checked certificate for 8 × 9.  This page follows the attempt
+    to prove that White also wins on 9 × 9.
+  </p>
+  <p>
+    Up to the board's symmetries Black has 15 first moves, so the proof splits into 15 pieces.  For
+    each one, a search looks for a tree of White replies whose every line ends in a <i>pairing</i>:
+    disjoint pairs of empty cells such that every Snaky that could still fit contains one.  From
+    there White simply answers each Black move with its partner.  A SAT solver finds the pairings,
+    and the search deepens one level at a time, trying 6 White replies at each step.  Every proof
+    found is written out as a certificate and re-verified by an independent checker that shares no
+    code with the search.  The checker also accepts two shortcuts: a Black move in no live Snaky
+    needs no special answer, and a move that a symmetry of the position maps onto an answered one
+    reuses that answer.  None of these certificates is in Lean yet.
+  </p>
+  <p>
+    So far every proved first move is answered at the centre, e5.  The open ones are the interior
+    moves, where Black can build a long line along a row; those searches need to go much deeper.
+  </p>
+  <p class="byline">
+    [ Page, search and proofs machine-produced by Claude (Anthropic) at Trevor Morris's direction.
+    The snapshot is refreshed by hand while the search runs. ]
+  </p>
+</section>
+
+<script type="module" src="nine-app.js"></script>
+</body>
+</html>

@@ -10,6 +10,9 @@
   --good: #2f7d4f;  /* hint ring colours, from ninepaths */
   --hot: #b26a00;
   --bad: #b23b3b;
+  --proved: #b9dcb5;  /* 9 x 9 status fills */
+  --running: #f2cf86;
+  --open: #ecdcb8;
 }
 
 * { box-sizing: border-box; }
@@ -103,3 +106,38 @@ code { font-size: 0.9em; }
 .hint-lost { font-size: 0.7px; font-weight: 700; text-anchor: middle; dominant-baseline: central; fill: var(--bad); }
 .hint-loss { font-size: 0.36px; font-weight: 650; text-anchor: middle; dominant-baseline: central; fill: #222; }
 .hint-left { font-size: 0.2px; text-anchor: middle; dominant-baseline: central; fill: #222; fill-opacity: 0.7; }
+
+/* 9 x 9 progress page */
+.tabs { display: flex; gap: 0.25rem; margin-bottom: 0.75rem; }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.summary { font-size: 1.25rem; }
+.bar { display: flex; gap: 2px; margin: 0.4rem 0; }
+.seg { flex: 1; height: 0.7rem; border-radius: 2px; border: 1px solid var(--line); }
+.seg-proved, .st-proved { background: var(--proved); fill: var(--proved); }
+.seg-running, .st-running { background: var(--running); fill: var(--running); }
+.seg-open, .st-open { background: var(--open); fill: var(--open); }
+.legend { margin: 0.5rem 0; }
+.key-proved { background: var(--proved); border: 1px solid var(--line); }
+.key-running { background: var(--running); border: 1px solid var(--line); }
+.key-open { background: var(--open); border: 1px solid var(--line); }
+.cell.st-proved:hover, .cell.st-running:hover, .cell.st-open:hover { fill: #fff3d6; }
+.cell.sel { stroke: var(--ink); stroke-width: 0.08; }
+.st-running.cell { stroke-dasharray: 0.12 0.08; animation: march 1.5s linear infinite; }
+@keyframes march { to { stroke-dashoffset: -0.4; } }
+@media (prefers-reduced-motion: reduce) { .st-running.cell { animation: none; } }
+.rep-label { font-size: 0.3px; font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.rep-depth { font-size: 0.26px; text-anchor: middle; dominant-baseline: central; pointer-events: none; fill: var(--muted); }
+.echo { font-size: 0.22px; text-anchor: middle; dominant-baseline: central; pointer-events: none; fill: var(--muted); opacity: 0.6; }
+.detail h3 { margin: 0.75rem 0 0.25rem; font-size: 1.05rem; }
+.detail h3 .sub { font-weight: 400; color: var(--muted); font-size: 0.9rem; margin-left: 0.4rem; }
+.detail p { margin: 0.3rem 0; font-size: 0.95rem; }
+.detail code { font-size: 0.8rem; word-break: break-word; }
+.chart { width: 100%; max-width: 340px; height: auto; display: block; margin-top: 0.5rem; }
+.chart text { font-size: 9px; text-anchor: middle; fill: var(--muted); }
+.bar-fail { fill: #b9b0a0; }
+.bar-proved { fill: var(--good); }
+.bar-running { fill: none; stroke: var(--hot); stroke-width: 1.2; stroke-dasharray: 3 2; }
+.pair { stroke: #1f4fc4; stroke-width: 0.1; stroke-linecap: round; opacity: 0.55; }
+.pair-end { fill: #1f4fc4; opacity: 0.7; }
+.cell.sel { stroke: var(--ink); stroke-width: 0.08; stroke-dasharray: none; animation: none; }
+nav.repo a { color: inherit; }
