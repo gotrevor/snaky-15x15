@@ -285,3 +285,21 @@ test('hintMarks: best always marked, plus anything better than the most common; 
   assert.equal(hintMarks([0, 0, 0]).hiddenLoss, null);
   assert.deepEqual(shown([0, 0, 0]), [0, 0, 0]);
 });
+
+test('hintMarks invariants on random boards: the best is always marked, unmarked cells are the worst', async () => {
+  const { hintMarks } = await import('../engine.js');
+  const rand = rng(2026);
+  for (let t = 0; t < 2000; t++) {
+    const n = 1 + Math.floor(rand() * 60);
+    const spread = 1 + Math.floor(rand() * 8);
+    const vals = Array.from({ length: n }, () => Math.floor(rand() * spread));
+    const m = hintMarks(vals);
+    const best = Math.max(...vals);
+    assert.equal(m.best, best);
+    assert.ok(vals.filter((v) => v === best).every(m.show), `a best move unmarked in ${vals}`);
+    const hidden = vals.filter((v) => !m.show(v)), shown = vals.filter(m.show);
+    // Nothing unmarked beats anything marked: the blank cells are the worst ones.
+    if (hidden.length) assert.ok(Math.max(...hidden) <= Math.min(...shown), `${vals}`);
+    assert.equal(m.hiddenLoss, hidden.length ? best - Math.max(...hidden) : null);
+  }
+});
