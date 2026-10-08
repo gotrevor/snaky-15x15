@@ -1,4 +1,4 @@
-import { label, parseLabel, BLACK, EMPTY } from './engine.js';
+import { label, parseLabel, hintMarks, BLACK, EMPTY } from './engine.js';
 import { parseCert, repOf, Play } from './nine.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -270,8 +270,8 @@ function setStatus(a, b) { $('status').textContent = a; $('why').textContent = b
 
 // Black hints, as the 15 x 15 page's White hints: a disc ringed green / amber / red, the big
 // number the moves given up against Black's best known move, the small one the most Black moves
-// White's proof can still need after that move.  Cells with the most common value stay
-// unmarked, except that a best move is never blank: then they get a green dot.
+// White's proof can still need after that move.  Which cells get a disc: hintMarks in engine.js
+// (the best always; the most common value and everything worse stay unmarked).
 // "?" marks an unknown path (no proof yet), "!" a Black win, a dot a dead cell.
 const lossClass = (loss) => (loss === 0 ? 'good' : loss < 3 ? 'hot' : 'bad');
 
@@ -287,16 +287,13 @@ function blackHints() {
 
 function hintSummary(hints) {
   const vals = hints.filter((h) => h.kind === 'value');
-  if (!vals.length) return { best: null, common: null };
-  const best = Math.max(...vals.map((h) => h.value));
-  const count = new Map();
-  for (const h of vals) count.set(h.value, (count.get(h.value) || 0) + 1);
-  const common = [...count].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0][0];
-  return { best, common };
+  if (!vals.length) return { best: null, marks: null };
+  const marks = hintMarks(vals.map((h) => h.value));
+  return { best: marks.best, marks };
 }
 
 function drawHints(hints) {
-  const { best, common } = hintSummary(hints);
+  const { best, marks } = hintSummary(hints);
   const g = el('g', { 'pointer-events': 'none' }, svg);
   for (const h of hints) {
     const [cx, cy] = centre(h.cell);
@@ -309,10 +306,7 @@ function drawHints(hints) {
     } else if (h.kind === 'win') {
       el('circle', { cx, cy, r: 0.42, class: 'hint-disc hint-bad' }, g);
       el('text', { x: cx, y: cy + 0.02, class: 'hint-lost' }, g).textContent = '!';
-    } else if (h.value === common) {
-      // A best move is never left blank: when the common value is the best, each gets a green dot.
-      if (common === best) el('circle', { cx, cy, r: 0.14, class: 'hint-dot hint-good' }, g);
-    } else {
+    } else if (marks.show(h.value)) {
       el('circle', { cx, cy, r: 0.42, class: `hint-disc hint-${lossClass(best - h.value)}` }, g);
       el('text', { x: cx, y: cy - 0.05, class: 'hint-loss' }, g).textContent = String(best - h.value);
       el('text', { x: cx, y: cy + 0.25, class: 'hint-left' }, g).textContent = String(h.value);
@@ -321,7 +315,7 @@ function drawHints(hints) {
 }
 
 function hintText(hints) {
-  const { best, common } = hintSummary(hints);
+  const { best, marks } = hintSummary(hints);
   const unknown = hints.some((h) => h.kind === 'unknown');
   const wins = hints.filter((h) => h.kind === 'win').map((h) => label(N, h.cell));
   const view = play && play.view();
@@ -333,12 +327,13 @@ function hintText(hints) {
     head = 'White holds a pairing: every move scores 0, and the pairing answers it.';
   } else if (best === 0) {
     head = 'Whatever you play, White\'s reply reaches a pairing: every move scores 0.';
+  } else if (marks && marks.uniform) {
+    head = `Every move scores the same: White's proof needs up to ${best} more Black moves whatever you play.`;
   } else if (best !== null) {
     head = `Your best ${unknown ? 'known ' : ''}moves (green, 0) keep White's proof going for up to ${best} more Black moves.`;
   } else head = '';
-  const rest = best === null || best === 0 || (view && view.kind === 'pave') ? '' : best === common
-    ? 'Every dotted cell is a best move too (green dot).'
-    : `Every unmarked cell gives up ${best - common} (White's proof needs up to ${common} more).`;
+  const rest = !marks || marks.uniform || (view && view.kind === 'pave') ? ''
+    : marks.hiddenLoss === null ? '' : `Every unmarked cell gives up ${marks.hiddenLoss} or more.`;
   return { head, rest, unknown: unknown && !(play && play.unknown), values: best !== null && best > 0 };
 }
 

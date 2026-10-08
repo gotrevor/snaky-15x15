@@ -267,3 +267,20 @@ test('Line: ← takes back, → replays in order, a different move ends the repl
   assert.equal(l.back(), false);              // nothing before Black's opening move
   assert.deepEqual(l.whites, []);
 });
+
+test('hintMarks: best always marked, plus anything better than the most common; the rest hidden', async () => {
+  const { hintMarks } = await import('../engine.js');
+  const shown = (vals) => { const m = hintMarks(vals); return vals.filter(m.show); };
+  // 9 x 9 after c3 e5: the best value is also the most common one.
+  assert.deepEqual(shown([6, 6, 6, 5, 4, 2]), [6, 6, 6]);
+  assert.equal(hintMarks([6, 6, 6, 5, 4, 2]).hiddenLoss, 1);
+  // 15 x 15 after h8 h7 i8: common 10 is not the best; 9 (worse than common) is hidden too.
+  assert.deepEqual(shown([10, 10, 10, 10, 23, 21, 13, 9]), [23, 21, 13]);
+  assert.equal(hintMarks([10, 10, 10, 10, 23, 21, 13, 9]).hiddenLoss, 13);
+  // A tie for most common: the lower value counts, so the higher one is shown.
+  assert.deepEqual(shown([3, 3, 5, 5, 7]), [5, 5, 7]);
+  // Every move the same: nothing marked.
+  assert.equal(hintMarks([0, 0, 0]).uniform, true);
+  assert.equal(hintMarks([0, 0, 0]).hiddenLoss, null);
+  assert.deepEqual(shown([0, 0, 0]), []);
+});
