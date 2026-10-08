@@ -57,7 +57,7 @@ def main():
         if os.path.isdir(dest):
             shutil.rmtree(dest)
         os.makedirs(dest)
-        names = ["progress.json"] + [m["cert"] for m in snap["moves"] if m.get("cert")]
+        names = ["progress.json"] + [m[k] for m in snap["moves"] for k in ("cert", "report") if m.get(k)]
         for name in names:
             shutil.copyfile(os.path.join(args.nine, name), os.path.join(dest, name))
         wrote.append(f"9x9/ ({len(names)} files)")

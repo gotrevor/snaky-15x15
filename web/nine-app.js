@@ -1,5 +1,5 @@
 import { label, parseLabel, hintMarks, BLACK, EMPTY } from './engine.js';
-import { parseCert, repOf, Play } from './nine.js';
+import { parseCert, repOf, Play, Explorer } from './nine.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const $ = (id) => document.getElementById(id);
@@ -133,6 +133,7 @@ function chart(rec) {
 function render() {
   svg.setAttribute('viewBox', `${-M} 0 ${N + M} ${N + M}`);
   svg.replaceChildren();
+  svg.classList.remove('offproof', 'allbest');
   if (mode === 'progress') drawProgress(); else drawPlay();
 }
 
@@ -181,10 +182,25 @@ function certFor(rep) {
 }
 
 let busy = false;
+let explore = null;        // Explorer on an open first move with a live search report
+const reports = new Map(); // rep cell -> Promise<report>
+
+function reportFor(rep) {
+  if (!reports.has(rep)) {
+    const rec = byRep.get(rep);
+    reports.set(rep, fetch(DATA + rec.report, { cache: 'no-cache' }).then((r) => {
+      if (!r.ok) throw new Error(`could not load ${rec.report}`);
+      return r.json();
+    }));
+  }
+  return reports.get(rep);
+}
+
 const FIRST = 'Your move: you are Black.  Pick a first move.';
 
 async function newGame(moves = []) {
   play = null;
+  explore = null;
   blacks = [];
   setStatus(FIRST, '');
   for (const m of moves) {
@@ -193,13 +209,38 @@ async function newGame(moves = []) {
   render();
 }
 
-// Plays Black's move and White's answer.  Returns false if the move was refused.
+// Plays Black's move and White's answer (exploring a search report: the move of the side to
+// move).  Returns false if the move was refused.
 async function blackMove(cell, draw = true) {
   if (busy) return false;
+  if (explore) {
+    if (explore.board[cell] !== EMPTY || explore.winner()) return false;
+    explore.place(cell);
+    blacks.push(cell);
+    describeExplore();
+    if (draw) render();
+    return true;
+  }
   if (!play) {
     const rep = classOf[cell];
     const rec = byRep.get(rep);
     const { g } = repOf(N, N, cell, [rep]);
+    if (rec.status !== 'proved' && rec.report) {
+      busy = true;
+      setStatus(`Loading the live search for ${rec.cell}…`, '');
+      let rp;
+      try { rp = await reportFor(rep); } catch (e) { setStatus(String(e.message), ''); busy = false; return false; }
+      busy = false;
+      const usable = (n) => n && Object.keys(n).length;
+      const which = $('xpass').value === 'last' && usable(rp.last) ? rp.last : rp.nodes;
+      explore = new Explorer(N, N, which);
+      explore.report = rp;
+      explore.start(cell, g);
+      blacks = [cell];
+      describeExplore();
+      if (draw) render();
+      return true;
+    }
     play = new Play(N, N);
     if (rec.status !== 'proved') {
       // An unknown path: no proof yet.  White answers the candidate reply, mapped onto this cell.
@@ -264,6 +305,93 @@ function describe() {
     return;
   }
   setStatus(`Your move.  ${open}`, `White played ${label(N, last.cell)}, ${WHY[last.why] || last.why}.`);
+}
+
+// No disc for 'pending' (not reached yet): that is most of the board at a fresh node.
+const XSYM = { open: '✕', searching: '…', proved: '✓', pave: 'P', skipped: '–' };
+
+function describeExplore() {
+  const x = explore, rp = x.report;
+  const rec = byRep.get(classOf[blacks[0]]);
+  const pass = x.nodes === rp.last ? `last complete pass, depth ${rp.last_iter}` : `depth-${rp.iter} pass, in progress`;
+  const when = rp.time ? new Date(rp.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '?';
+  if (x.winner()) {
+    setStatus('Black made a Snaky in this line.', 'Exploring only: you chose White\'s moves too, so this says nothing about the proof.');
+    return;
+  }
+  setStatus(`Exploring the live search for ${rec.cell}: no proof yet.`,
+    `${x.toMove() === BLACK ? 'Black' : 'White'} to move.  Search report ${when} (${pass}).`);
+}
+
+function exploreText() {
+  const x = explore, r = x.record();
+  const last = x.history.at(-1);
+  const prev = last ? label(N, last.cell) : '';
+  if (!r) return 'Beyond the search\'s report: nothing is recorded for this line yet.  Any move here is an unknown path.';
+  if (r.result === 'paved') return `White has a pairing here: this line is settled for White.`;
+  if (r.result === 'no depth left') return 'The search ran out of depth here: still open.';
+  if (r.result === 'black won') return 'Black has a Snaky here.';
+  if (r.result === 'double threat') return `Black has a double threat after ${prev}: this line fails for White at this depth.`;
+  const count = (st) => [...x.listed().values()].filter((e) => e.status === st).length;
+  if (r.side === 'W') {
+    // Names on the board, not in the search's frame (they differ after a mirrored move).
+    const board = (c) => label(N, x.finv[parseLabel(N, c)]);
+    const list = Object.entries(r.cands || {}).map(([c, st]) => `${board(c)} ${st}`).join(', ');
+    return `White to move after ${prev}.  The search tries ${Object.keys(r.cands || {}).length} replies here (${list}).  Tap one to play it for White.${r.forced ? '  (Forced: Black threatens to win.)' : ''}`;
+  }
+  const parts = ['open', 'searching', 'proved', 'pave', 'pending', 'skipped'].map((st) => [st, count(st)]).filter(([, n]) => n);
+  const open = count('open');
+  return `Black to move after White ${prev}: ${parts.map(([st, n]) => `${n} ${st}`).join(', ')}.` +
+    (open ? `  ✕ marks the open sub-lines: Black moves White's ${prev} has no answer to yet at this depth.` : '') +
+    '  Tap a Black move to follow it.';
+}
+
+function drawExplore() {
+  const x = explore;
+  svg.classList.add('offproof');
+  svg.classList.remove('allbest');
+  drawGrid((cell, r) => {
+    if (x.board[cell] === EMPTY && !x.winner()) {
+      r.classList.add('playable');
+      r.addEventListener('click', () => blackMove(cell));
+    }
+  });
+  x.board.forEach((v, cell) => {
+    if (v === EMPTY) return;
+    const [cx, cy] = centre(cell);
+    el('circle', { cx, cy, r: 0.42, class: v === BLACK ? 'stone-b' : 'stone-w', 'pointer-events': 'none' }, svg);
+  });
+  const last = x.history.at(-1);
+  if (last) {
+    const [cx, cy] = centre(last.cell);
+    el('circle', { cx, cy, r: 0.18, class: 'last', 'pointer-events': 'none' }, svg);
+  }
+  if ($('bhints').checked) {
+    const g = el('g', { 'pointer-events': 'none' }, svg);
+    for (const m of x.marks()) {
+      const sym = XSYM[m.status];
+      if (!sym) continue;
+      const [cx, cy] = centre(m.cell);
+      el('circle', { cx, cy, r: 0.42, class: `hint-disc xd-${m.status}` }, g);
+      el('text', { x: cx, y: m.reply >= 0 ? cy - 0.06 : cy + 0.02, class: `x-sym xs-${m.status}` }, g).textContent = sym;
+      if (m.reply >= 0) el('text', { x: cx, y: cy + 0.25, class: 'hint-left' }, g).textContent = `→${label(N, m.reply)}`;
+    }
+  }
+  $('hint-head').textContent = exploreText();
+  $('hints-help').hidden = true;
+  $('explore-help').hidden = false;
+  const usable = (n) => n && Object.keys(n).length;
+  $('xpass-wrap').hidden = !usable(x.report.last);
+  const list = $('moves');
+  list.replaceChildren();
+  for (let i = 0; i < x.history.length; i += 2) {
+    const li = document.createElement('li');
+    const w = x.history[i + 1];
+    li.textContent = `${label(N, x.history[i].cell).padEnd(4)} ${w ? label(N, w.cell) : ''}`;
+    list.appendChild(li);
+  }
+  list.scrollTop = list.scrollHeight;
+  if (mode === 'play') history.replaceState(null, '', `#play=${blacks.map((c) => label(N, c)).join(',')}`);
 }
 
 function setStatus(a, b) { $('status').textContent = a; $('why').textContent = b; }
@@ -340,6 +468,8 @@ function hintText(hints) {
 }
 
 function drawPlay() {
+  $('explore-help').hidden = true;
+  if (explore) { drawExplore(); return; }
   svg.classList.toggle('offproof', !!(play && play.unknown));
   drawGrid((cell, r) => {
     if (!play || (!play.won && play.board[cell] === EMPTY)) {
@@ -418,6 +548,7 @@ $('new').addEventListener('click', () => newGame());
 $('undo').addEventListener('click', () => newGame(blacks.slice(0, -1)));
 $('pairs').addEventListener('change', render);
 $('bhints').addEventListener('change', render);
+$('xpass').addEventListener('change', () => newGame(blacks));
 
 // Deep links: #play=c3,e4 starts a game with those Black moves; #c3 selects a first move.
 async function fromHash() {

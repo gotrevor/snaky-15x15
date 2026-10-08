@@ -271,3 +271,69 @@ test('9 x 9 c3 e5, f6 f5, g6 d6: every move scores 0 and all 75 are marked', { s
   assert.ok(vals.every((v) => v === 0));
   assert.equal(vals.filter(hintMarks(vals).show).length, 75);
 });
+
+// ---- Explorer: the live search reports ------------------------------------------------------
+test('Explorer: statuses by side to move, mirrored moves map onto the listed ones, frame follows', async () => {
+  const { Explorer } = await import('../nine.js');
+  const L = (s) => parseLabel(9, s);
+  const nodes = {
+    e5: { side: 'W', d: 15, cands: { e4: 'searching', d5: 'pending' } },
+    'e5 e4': { side: 'B', d: 14, moves: { d5: ['open', null], d4: ['proved', 'c4'], e6: ['pave', 'e7'] } },
+    'e5 e4 d5': { side: 'W', d: 14, cands: { c5: 'searching', f5: 'open' } },
+  };
+  const x = new Explorer(9, 9, nodes);
+  x.start(L('e5'), symmetries(9, 9)[0]);
+  const at = (m, s) => m.find((h) => h.cell === L(s));
+  let m = x.marks();
+  assert.equal(at(m, 'e4').status, 'searching');
+  assert.equal(at(m, 'd5').status, 'pending');
+  assert.equal(at(m, 'f5').status, 'pending');          // e5 alone is fixed by all 8 symmetries
+  assert.equal(at(m, 'a1').status, 'unknown');
+  x.place(L('e4'));
+  m = x.marks();
+  assert.equal(at(m, 'd5').status, 'open');
+  assert.equal(at(m, 'f5').status, 'open');            // mirror of d5 across the e file fixes e5, e4
+  assert.equal(at(m, 'f4').status, 'proved');          // mirror of d4
+  assert.equal(at(m, 'f4').reply, L('g4'));            // and its reply c4 mirrors to g4
+  assert.equal(at(m, 'e6').status, 'pave');
+  assert.equal(at(m, 'a9').status, 'unknown');         // not listed in this record
+  // Play the mirror f5: the frame flips, so the next record is "e5 e4 d5" and c5 shows at g5.
+  x.place(L('f5'));
+  assert.equal(x.key(), 'e5 e4 d5');
+  m = x.marks();
+  assert.equal(at(m, 'g5').status, 'searching');
+  assert.equal(at(m, 'd5').status, 'open');            // f5 in the search's frame
+  x.place(L('g5'));
+  assert.equal(x.record(), null);                       // beyond the report: unknown everywhere
+  assert.ok(x.marks().every((h) => h.status === 'unknown' || h.status === 'dead'));
+});
+
+test('9 x 9 snapshot: every published report walks cleanly from every cell of its first move', { skip: !WEB9 && 'set SNAKY_WEB9' }, async () => {
+  const { Explorer } = await import('../nine.js');
+  const snap = JSON.parse(readFileSync(`${WEB9}/progress.json`, 'utf8'));
+  const reps = snap.moves.map((m) => parseLabel(9, m.cell));
+  let walked = 0;
+  for (const m of snap.moves.filter((x) => x.report)) {
+    const rep = JSON.parse(readFileSync(`${WEB9}/${m.report}`, 'utf8'));
+    assert.equal(rep.format, 'snaky-white-report-v1');
+    for (const nodes of [rep.nodes, rep.last]) {
+      if (!nodes || !Object.keys(nodes).length) continue;
+      assert.ok(nodes[m.cell], `${m.cell}: no root record`);
+      for (let cell = 0; cell < 81; cell++) {
+        const r = repOf(9, 9, cell, reps);
+        if (r.rep !== parseLabel(9, m.cell)) continue;
+        const x = new Explorer(9, 9, nodes);
+        x.start(cell, r.g);
+        assert.equal(x.key(), m.cell);
+        // Follow the first listed move at each step while records last.
+        for (let k = 0; k < 12 && x.record(); k++) {
+          const next = x.marks().find((h) => !['unknown', 'dead'].includes(h.status));
+          if (!next) break;
+          x.place(next.cell);
+          walked++;
+        }
+      }
+    }
+  }
+  assert.ok(walked > 0 || !snap.moves.some((x) => x.report));
+});
