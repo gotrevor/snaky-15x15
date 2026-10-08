@@ -1,4 +1,4 @@
-import { parseCards, Game, Line, label, parseLabel, SNAKY, BLACK, WHITE, EMPTY } from './engine.js';
+import { parseCards, Game, Line, label, parseLabel, hintMarks, SNAKY, BLACK, WHITE, EMPTY } from './engine.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const $ = (id) => document.getElementById(id);
@@ -123,22 +123,19 @@ let hoverLayer = null;
 // number the moves it gives up against White's best, the small one the most Black moves the
 // strategy can still need.  Most cells share one value (everything outside the card's region
 // gets the pass answer, and the opening card's region is nearly the whole board), so cells with
-// the most common value stay unmarked (a green dot if that value is the best) and only the cells
-// that differ get a disc.  Black's
+// the best value always get a disc, and so does every value better than the most common one; the
+// most common value and everything worse stay unmarked (hintMarks in engine.js).  Black's
 // threats override: one is a forced move ("!"), two or more a forced loss ("✕" on each).
 const lossClass = (loss) => (loss === 0 ? 'good' : loss < 3 ? 'hot' : 'bad');
 
 function hintSummary() {
   const vals = game.whiteValues();
   const best = Math.max(...vals.map((v) => v.value));
-  const count = new Map();
-  for (const v of vals) count.set(v.value, (count.get(v.value) || 0) + 1);
-  const common = [...count].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0][0];
-  return { vals, best, common, commonLoss: best - common };
+  return { vals, best, marks: hintMarks(vals.map((v) => v.value)) };
 }
 
 function drawHints() {
-  const { vals, best, common } = hintSummary();
+  const { vals, best, marks } = hintSummary();
   const threats = game.threats();
   const g = el('g', { 'pointer-events': 'none' }, svg);
   if (threats.length >= 2) {
@@ -157,11 +154,7 @@ function drawHints() {
       el('text', { x: cx, y: cy + 0.25, class: 'hint-left' }, g).textContent = String(value);
       continue;
     }
-    if (value === common) {
-      // A best move is never left blank: when the common value is the best, each gets a green dot.
-      if (loss === 0) el('circle', { cx, cy, r: 0.14, class: 'hint-dot hint-good' }, g);
-      continue;
-    }
+    if (!marks.show(value)) continue;
     el('circle', { cx, cy, r: 0.42, class: `hint-disc hint-${lossClass(loss)}` }, g);
     el('text', { x: cx, y: cy - 0.05, class: 'hint-loss' }, g).textContent = String(loss);
     el('text', { x: cx, y: cy + 0.25, class: 'hint-left' }, g).textContent = String(value);
@@ -197,18 +190,17 @@ function renderPanel() {
   const showHints = $('hints').checked && !game.won;
   $('hints-help').hidden = !showHints;
   if (showHints) {
-    const { best, common, commonLoss } = hintSummary();
+    const { best, marks } = hintSummary();
     const threats = game.threats().map((c) => label(game.cols, c));
     $('hints-best').textContent = threats.length >= 2
       ? `Lost: Black wins next move at ${threats.join(' or ')} (✕), and you can block only one.`
       : threats.length === 1
         ? `Forced: Black wins at ${threats[0]} next move unless you play there (!).`
         : `Your best moves (green, 0) leave Black needing up to ${best} more.`;
-    $('hints-pass').textContent = threats.length >= 2 ? '' : common === 1
-      ? 'Anywhere else, Black wins next move.'
-      : commonLoss === 0
-        ? 'Every dotted cell is a best move too (green dot).'
-        : `Every unmarked cell gives up ${commonLoss} (Black needs up to ${common}).`;
+    $('hints-pass').textContent = threats.length >= 2 || marks.hiddenLoss === null ? ''
+      : marks.hiddenLoss === best - 1
+        ? 'Anywhere else, Black wins next move.'
+        : `Every unmarked cell gives up ${marks.hiddenLoss} or more.`;
     $('hints-legend').hidden = threats.length >= 2;
   }
 
