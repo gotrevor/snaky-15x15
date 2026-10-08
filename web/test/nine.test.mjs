@@ -240,3 +240,34 @@ test('9 x 9 snapshot: random and greedy Black lose from every proved first move'
   }
   for (const w of ['tree', 'symmetry', 'pair']) assert.ok(whys.has(w), `rule ${w} never fired`);
 });
+
+test('every position of every game shows at least one best move (6 x 6, 7 x 7)', async () => {
+  const { hintMarks } = await import('../engine.js');
+  for (const n of [6, 7]) {
+    const cert = parseCert(TEXT[n]);
+    for (let s = 0; s < 60; s++) {
+      const p = new Play(n, n);
+      p.attach(cert);
+      const rand = rng(31 * n + s);
+      while (!p.won) {
+        const vals = p.hints().filter((h) => h.kind === 'value').map((h) => h.value);
+        if (vals.length) assert.ok(vals.some(hintMarks(vals).show), `blank board after ${p.history.map((h) => h.cell)}`);
+        p.black(blackChoice(p, rand, s % 2 === 0));
+      }
+    }
+  }
+});
+
+test('9 x 9 c3 e5, f6 f5, g6 d6: every move scores 0 and all 75 are marked', { skip: !WEB9 && 'set SNAKY_WEB9' }, async () => {
+  const { hintMarks } = await import('../engine.js');
+  const cert = parseCert(readFileSync(`${WEB9}/cert-c3.txt`, 'utf8'));
+  const p = new Play(9, 9);
+  const c3 = parseLabel(9, 'c3');
+  p.firstMove(c3, cert, repOf(9, 9, c3, [c3]).g);
+  assert.equal(p.black(parseLabel(9, 'f6')), parseLabel(9, 'f5'));
+  assert.equal(p.black(parseLabel(9, 'g6')), parseLabel(9, 'd6'));
+  const vals = p.hints().filter((h) => h.kind === 'value').map((h) => h.value);
+  assert.equal(vals.length, 75);
+  assert.ok(vals.every((v) => v === 0));
+  assert.equal(vals.filter(hintMarks(vals).show).length, 75);
+});
