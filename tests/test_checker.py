@@ -115,3 +115,17 @@ def test_cite_teeth(tmp_path):
     victim.write_text(json.dumps(data))
     rc, out = check(d / "top.json")
     assert rc != 0 and "sha256 mismatch" in out, out
+
+
+def test_pass_zone_covers_mirrored_support(tmp_path):
+    # Node 3 covers White's right-hand replies by the mirror i -> 18-i, so Black answers them
+    # with the mirror image of node 4's strategy, which answers on cell 7 (the image of 11).
+    # Node 1's pass leads to node 3, so node 1's zone must contain 7; the listed children never
+    # mention it.
+    rc, out = check(os.path.join(FIX, "black-1x19-mirror.json"))
+    assert rc == 1 and "node 1: zone misses [7]" in out, out
+    c = load("black-1x19-mirror.json")
+    c["nodes"][1]["zone"].append(7)
+    c["nodes"][1]["replies"].append([7, 10])
+    rc, out = mutated(tmp_path, c)
+    assert rc == 0 and out.startswith("VALID black wins 1x19"), out

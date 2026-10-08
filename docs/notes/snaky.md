@@ -36,7 +36,7 @@ Root certificate sha256: `e9cd50f338b0e1b71d469bc32ccd41207907b9649c17da88dd8a85
 
 ## How the certificate is built
 
-- **Game tree with relevance zones.**  A Black node plays a cell.  A White node lists a zone Z of cells, a certificate child for each White reply in Z, and a "pass" child: a proof that Black wins even if White passes.  Any White move outside Z is covered by the pass child, because a Black win stays a win after extra White stones on cells that the winning subtree never mentions.
+- **Game tree with relevance zones.**  A Black node plays a cell.  A White node lists a zone Z of cells, a certificate child for each White reply in Z, and a "pass" child: a proof that Black wins even if White passes.  Any White move outside Z is covered by the pass child, because a Black win stays a win after extra White stones on cells that the winning strategy never plays or answers.  That support includes the mirror image of every child reused by symmetry, since a reused child is played in mirror image.
 - **Symmetry.**  If a board symmetry fixes the current position, one child covers each orbit of White replies.
 - **Citations.**  A node may cite another certificate file (by relative path and sha256) whose start position must equal the current position, and the checker verifies it recursively.  This is how the 1,750 files fit together.
 - **The opening.**  Black plays the centre h8.  A pass proof for "Black h8, White passes" (Black to move again) has a 107-cell zone, and the 22 symmetry classes of White replies inside it each have their own certificate.
@@ -49,7 +49,7 @@ Root certificate sha256: `e9cd50f338b0e1b71d469bc32ccd41207907b9649c17da88dd8a85
 
 - every Black move is on a free cell;
 - every "won" leaf is a placement of the shape owned by Black;
-- every White node's zone, together with its pass child, covers all free cells: the zone must contain the support of the pass child, and every zone cell needs a child, up to a symmetry that fixes the position;
+- every White node's zone, together with its pass child, covers all free cells: the zone must contain the support of the pass child's strategy (mirror images of symmetry-reused children included), and every zone cell needs a child, up to a symmetry that fixes the position;
 - every citation's file hash matches and its start position equals the citing position.
 
 The tests (`tests/test_checker.py`) show it rejects certificates with a dropped child, an occupied reply cell, a non-placement "won" set, a zone that misses part of the pass child's support, a missing pass child, the wrong shape, a tampered cited file, or a citation from the wrong position.  The checker shares no code with the search.

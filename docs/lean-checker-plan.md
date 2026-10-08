@@ -60,7 +60,7 @@ No per-position hand proofs: the certificate is data.
 
 - Black node: `play b` (b free) then a White node; or `cite` another file whose start position must equal the current one (data: the file list; hashes are irrelevant inside Lean if the data is embedded directly).
 - White node `won p`: p is a placement owned by Black.
-- White node `zone Z, replies, pass`: every free cell in Z has a reply child or is covered by symmetry (R3: a board symmetry g fixing the normalized position maps it to a cell with a child); the pass child (if present) proves a Black win with White having passed; Z must contain supp(pass) ∩ free (R5); without a pass child Z must contain all free relevant cells.
+- White node `zone Z, replies, pass`: every free cell in Z has a reply child or is covered by symmetry (R3: a board symmetry g fixing the normalized position maps it to a cell with a child); the pass child (if present) proves a Black win with White having passed; Z must contain supp(pass) ∩ free (R5), where supp counts g⁻¹(supp(child)) for each reply covered through g; without a pass child Z must contain all free relevant cells.
 
 ## Lemmas the soundness proof needs
 
