@@ -6,8 +6,8 @@ plane win in Lean in 2026; see `docs/notes/snaky.md`).  The evidence is an expli
 strategy-tree certificate checked by an independent checker:
 
 ```sh
-./verify        # ~12 min, Python stdlib only
-# VALID black wins 15x15 (25 node-positions checked, 25 nodes, plus 1749 cited files / 145906126 node-positions)
+./verify        # ~18 min and ~20 GB RAM, Python stdlib only
+# VALID black wins 15x15 (25 node-positions checked, 25 nodes, plus 1749 cited files / 145906126 node-positions; 7 symmetric covers widened a support)
 ```
 
 - `cert/snaky-15x15.tar.gz`: the certificate (1,750 JSON files, sha256 in `verify`)

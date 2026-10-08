@@ -20,10 +20,10 @@ In the weak (maker-breaker) achievement game for Snaky, the hexomino {(0,0),(1,0
 
 A win on 15 × 15 is a win on every larger board and on the infinite plane: Black plays the same strategy inside the window and answers any White move outside it with an arbitrary move.
 
-The evidence is a certificate: a Black strategy tree, 1,750 JSON files (93 MB, 12 MB compressed) in `cert/snaky-15x15.tar.gz`, accepted by the stand-alone checker in `checker/check.py`.  `./verify` checks the archive hash, unpacks it, and runs the checker (Python standard library only, about 12 minutes on one core):
+Besides the Lean proof (below), the evidence is a certificate: a Black strategy tree, 1,750 JSON files (93 MB, 12 MB compressed) in `cert/snaky-15x15.tar.gz`, accepted by the stand-alone checker in `checker/check.py`.  `./verify` checks the archive hash, unpacks it, and runs the checker (Python standard library only, about 18 minutes on one core and 20 GB of memory):
 
 ```
-VALID black wins 15x15 (25 node-positions checked, 25 nodes, plus 1749 cited files / 145906126 node-positions)
+VALID black wins 15x15 (25 node-positions checked, 25 nodes, plus 1749 cited files / 145906126 node-positions; 7 symmetric covers widened a support)
 ```
 
 Root certificate sha256: `e9cd50f338b0e1b71d469bc32ccd41207907b9649c17da88dd8a85b5e4997243`.
@@ -80,7 +80,7 @@ The kernel checks take about 25 CPU minutes; `tools/build-kernel` builds the chu
 ## Reproduce
 
 ```sh
-./verify                                            # about 12 minutes
+./verify                                            # about 18 minutes
 uv run --with pytest pytest -q tests                # checker teeth tests; SNAKY_FULL=1 adds the full check
 tools/build-kernel                                  # the Lean proof (about 9 minutes, kernel-checked)
 ```
