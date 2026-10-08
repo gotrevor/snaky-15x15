@@ -7,6 +7,9 @@
   --zone: #a9c7ef;
   --accent: #c0392b;
   --win: #e67e22;
+  --good: #2f7d4f;  /* hint ring colours, from ninepaths */
+  --hot: #b26a00;
+  --bad: #b23b3b;
 }
 
 * { box-sizing: border-box; }
@@ -18,7 +21,8 @@ body {
   background: var(--bg);
 }
 
-header { padding: 1rem 1.25rem 0; }
+header { padding: 1rem 1.25rem 0; display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+.repo { color: var(--muted); font-size: 0.95rem; }
 h1 { margin: 0; font-size: 1.5rem; }
 h1 .sub { font-weight: 400; color: var(--muted); font-size: 1rem; margin-left: 0.5rem; }
 h2 { font-size: 1.15rem; margin: 0 0 0.5rem; }
@@ -88,3 +92,14 @@ code { font-size: 0.9em; }
 .win-cell { fill: none; stroke: var(--win); stroke-width: 0.14; }
 .win-path { fill: none; stroke: var(--win); stroke-width: 0.16; stroke-linecap: round; stroke-linejoin: round; opacity: 0.9; }
 .shape rect { fill: #1d1d1d; stroke: var(--bg); stroke-width: 0.06; }
+
+/* White hints (ninepaths candidate style) */
+.hint-disc { fill: #fdfdfd; fill-opacity: 0.92; stroke-width: 0.08; }
+.hint-disc.hint-good { stroke: var(--good); }
+.hint-disc.hint-hot { stroke: var(--hot); }
+.hint-disc.hint-bad { stroke: var(--bad); }
+.hint-disc.hint-forced { stroke: #1f4fc4; stroke-width: 0.12; }
+.hint-forced-mark { fill: #1f4fc4; }
+.hint-lost { font-size: 0.7px; font-weight: 700; text-anchor: middle; dominant-baseline: central; fill: var(--bad); }
+.hint-loss { font-size: 0.36px; font-weight: 650; text-anchor: middle; dominant-baseline: central; fill: #222; }
+.hint-left { font-size: 0.2px; text-anchor: middle; dominant-baseline: central; fill: #222; fill-opacity: 0.7; }

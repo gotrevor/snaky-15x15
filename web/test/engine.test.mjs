@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { parseCards, getCard, Game, label, parseLabel, EMPTY, BLACK, WHITE } from '../engine.js';
+import { parseCards, getCard, Game, Line, label, parseLabel, EMPTY, BLACK, WHITE } from '../engine.js';
 
 const CARDS = fileURLToPath(new URL('../../cert/snaky-15x15-cards.txt', import.meta.url));
 const text = readFileSync(CARDS, 'utf8');
@@ -181,4 +181,89 @@ test('the board never holds both colours on a cell, and stones alternate', () =>
   const g = playOut((gg) => freeCells(gg).at(-1));
   g.history.forEach((m, i) => assert.equal(m.color, i % 2 === 0 ? BLACK : WHITE));
   assert.equal(new Set(g.history.map((m) => m.cell)).size, g.history.length);
+});
+
+// White hints.
+
+test('every card height is exactly its longest line: 1 + the tallest hinted card (1 if none)', () => {
+  for (let j = 0; j < cs.lines.length; j++) {
+    const c = getCard(cs, j);
+    const kids = [...c.replies.values(), ...(c.pass ? [c.pass] : [])].map((h) => getCard(cs, h.j).h);
+    assert.equal(c.h, kids.length ? 1 + Math.max(...kids) : 1, `card ${j}`);
+  }
+});
+
+test('opening hints: the four cells touching h8 are White\'s best, 24; most cells are 15', () => {
+  const vals = new Game(cs).whiteValues();
+  assert.equal(vals.length, 224);
+  const best = Math.max(...vals.map((v) => v.value));
+  assert.equal(best, 24);
+  assert.deepEqual(vals.filter((v) => v.value === 24).map((v) => label(15, v.cell)).sort(),
+    ['g8', 'h7', 'h9', 'i8']);
+  const fifteen = vals.filter((v) => v.value === 15).length;
+  assert.ok(fifteen > 150, `expected most cells at 15, got ${fifteen}`);
+});
+
+test('a hint value is what the counter shows after playing it, and never beats bound - 1', () => {
+  const r = rng(4);
+  for (let n = 0; n < 200; n++) {
+    const g = new Game(cs);
+    while (!g.won) {
+      const vals = g.whiteValues();
+      assert.ok(Math.max(...vals.map((v) => v.value)) <= g.bound() - 1);
+      const pick = vals[Math.floor(r() * vals.length)];
+      g.whiteMove(pick.cell);
+      if (!g.won) assert.equal(g.bound(), pick.value);
+    }
+  }
+});
+
+test('threats: none at the start; one (a forced move) and two (a forced loss) in recorded games', () => {
+  const g = new Game(cs);
+  assert.deepEqual(g.threats(), []);
+  // Black h8 i8 j8 k8 l9: only k9 completes a Snaky (h8-k8, k9, l9).
+  for (const w of ['e5', 'f6', 'j11', 'j9']) g.whiteMove(parseLabel(15, w));
+  assert.deepEqual(g.threats().map((c) => label(15, c)), ['k9']);
+  const lost = new Game(cs);
+  for (const w of ['f9', 'k6', 'k8', 'k11', 'g5', 'g3']) lost.whiteMove(parseLabel(15, w));
+  assert.deepEqual(lost.threats().map((c) => label(15, c)).sort(), ['i3', 'i5']);
+});
+
+test('blocking a lone threat never hands Black a win at once; ignoring it always does', () => {
+  const r = rng(5);
+  let forced = 0;
+  for (let n = 0; n < 300; n++) {
+    const g = new Game(cs);
+    while (!g.won) {
+      const t = g.threats();
+      if (t.length === 1) {
+        forced++;
+        const ignore = new Game(cs);
+        for (const m of g.history.filter((h) => h.color === WHITE)) ignore.whiteMove(m.cell);
+        ignore.whiteMove(freeCells(ignore).find((c) => c !== t[0]));
+        assert.ok(ignore.won, 'ignoring the threat lets Black complete it');
+      }
+      const f = freeCells(g);
+      g.whiteMove(t.length === 1 ? t[0] : f[Math.floor(r() * f.length)]);
+      if (t.length === 1 && !g.won) assert.notEqual(g.history.at(-1).cell, t[0]);
+    }
+  }
+  assert.ok(forced > 50, `expected many forced moves, saw ${forced}`);
+});
+
+test('Line: ← takes back, → replays in order, a different move ends the replay line', () => {
+  const l = new Line([1, 2, 3]);
+  assert.ok(l.back()); assert.ok(l.back());
+  assert.deepEqual(l.whites, [1]);
+  assert.ok(l.forward());
+  assert.deepEqual(l.whites, [1, 2]);
+  l.play(3);                                  // the move → would replay: the line survives
+  assert.deepEqual([l.whites, l.redo], [[1, 2, 3], []]);
+  l.back(); l.back();
+  l.play(9);                                  // a different move: nothing left to replay
+  assert.deepEqual([l.whites, l.redo], [[1, 9], []]);
+  assert.equal(l.forward(), false);
+  assert.ok(l.back()); assert.ok(l.back());
+  assert.equal(l.back(), false);              // nothing before Black's opening move
+  assert.deepEqual(l.whites, []);
 });

@@ -1,4 +1,4 @@
-import { parseCards, Game, label, parseLabel, SNAKY, BLACK, WHITE, EMPTY } from './engine.js';
+import { parseCards, Game, Line, label, parseLabel, SNAKY, BLACK, WHITE, EMPTY } from './engine.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const $ = (id) => document.getElementById(id);
@@ -7,6 +7,7 @@ const svg = $('board');
 let cs = null;
 let game = null;
 let hover = -1;
+let line = new Line();  // White's moves, plus what ← took back for → to replay
 
 function el(name, attrs, parent) {
   const e = document.createElementNS(NS, name);
@@ -94,6 +95,7 @@ function render() {
       el('circle', { cx, cy, r: 0.3, class: 'ring-a' }, svg);
     }
   }
+  if ($('hints').checked && !game.won) drawHints();
   hoverLayer = el('g', { 'pointer-events': 'none' }, svg);
   drawHover();
 
@@ -116,6 +118,50 @@ function render() {
 }
 
 let hoverLayer = null;
+
+// White hints, drawn like ninepaths' candidates: a White disc ringed green / amber / red, the big
+// number the moves it gives up against White's best, the small one the most Black moves the
+// strategy can still need.  Most cells share one value (everything outside the card's region
+// gets the pass answer, and the opening card's region is nearly the whole board), so cells with
+// the most common value stay unmarked and only the cells that differ get a disc.  Black's
+// threats override: one is a forced move ("!"), two or more a forced loss ("✕" on each).
+const lossClass = (loss) => (loss === 0 ? 'good' : loss < 3 ? 'hot' : 'bad');
+
+function hintSummary() {
+  const vals = game.whiteValues();
+  const best = Math.max(...vals.map((v) => v.value));
+  const count = new Map();
+  for (const v of vals) count.set(v.value, (count.get(v.value) || 0) + 1);
+  const common = [...count].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0][0];
+  return { vals, best, common, commonLoss: best - common };
+}
+
+function drawHints() {
+  const { vals, best, common } = hintSummary();
+  const threats = game.threats();
+  const g = el('g', { 'pointer-events': 'none' }, svg);
+  if (threats.length >= 2) {
+    for (const cell of threats) {
+      const [cx, cy] = centre(cell);
+      el('text', { x: cx, y: cy, class: 'hint-lost' }, g).textContent = '✕';
+    }
+    return;
+  }
+  for (const { cell, value } of vals) {
+    const loss = best - value;
+    const [cx, cy] = centre(cell);
+    if (threats[0] === cell) {
+      el('circle', { cx, cy, r: 0.42, class: 'hint-disc hint-forced' }, g);
+      el('text', { x: cx, y: cy - 0.05, class: 'hint-loss hint-forced-mark' }, g).textContent = '!';
+      el('text', { x: cx, y: cy + 0.25, class: 'hint-left' }, g).textContent = String(value);
+      continue;
+    }
+    if (value === common) continue;
+    el('circle', { cx, cy, r: 0.42, class: `hint-disc hint-${lossClass(loss)}` }, g);
+    el('text', { x: cx, y: cy - 0.05, class: 'hint-loss' }, g).textContent = String(loss);
+    el('text', { x: cx, y: cy + 0.25, class: 'hint-left' }, g).textContent = String(value);
+  }
+}
 
 // Black's answer to the cell under the pointer (proof's view only); redraws one layer, not the board.
 function drawHover() {
@@ -143,6 +189,23 @@ function renderPanel() {
   }
   $('undo').disabled = whiteMoves().length === 0;
   $('view-help').hidden = !$('view').checked;
+  const showHints = $('hints').checked && !game.won;
+  $('hints-help').hidden = !showHints;
+  if (showHints) {
+    const { best, common, commonLoss } = hintSummary();
+    const threats = game.threats().map((c) => label(game.cols, c));
+    $('hints-best').textContent = threats.length >= 2
+      ? `Lost: Black wins next move at ${threats.join(' or ')} (✕), and you can block only one.`
+      : threats.length === 1
+        ? `Forced: Black wins at ${threats[0]} next move unless you play there (!).`
+        : `Your best moves (green, 0) leave Black needing up to ${best} more.`;
+    $('hints-pass').textContent = threats.length >= 2 ? '' : common === 1
+      ? 'Anywhere else, Black wins next move.'
+      : commonLoss === 0
+        ? 'Every unmarked cell is a best move too.'
+        : `Every unmarked cell gives up ${commonLoss} (Black needs up to ${common}).`;
+    $('hints-legend').hidden = threats.length >= 2;
+  }
 
   const ol = $('moves');
   ol.replaceChildren();
@@ -161,6 +224,7 @@ function renderPanel() {
 
 function play(cell) {
   if (game.won || game.board[cell] !== EMPTY) return;
+  line.play(cell);
   try {
     game.whiteMove(cell);
   } catch (e) {
@@ -188,13 +252,23 @@ async function main() {
     $('provenance').textContent = `Card set: ${cs.lines.length} cards, sha256 ${hex}.`;
   }
 
-  if (new URLSearchParams(location.search).has('view')) $('view').checked = true;
+  const params = new URLSearchParams(location.search);
+  if (params.has('view')) $('view').checked = true;
+  if (params.has('hints')) $('hints').checked = true;
   const whites = location.hash.slice(1).split('-').filter(Boolean).map((s) => parseLabel(cs.cols, s));
   newGame(whites.every((c) => c >= 0) ? whites : []);
+  line = new Line(whiteMoves());
 
-  $('new').addEventListener('click', () => newGame());
-  $('undo').addEventListener('click', () => newGame(whiteMoves().slice(0, -1)));
+  $('new').addEventListener('click', () => { line = new Line(); newGame(); });
+  $('undo').addEventListener('click', () => { if (line.back()) newGame(line.whites); });
+  // ← is "Take back", as in ninepaths; → replays what ← took back.
+  addEventListener('keydown', (e) => {
+    if (e.altKey || e.metaKey || e.ctrlKey) return;
+    if (e.key === 'ArrowLeft' && !$('undo').disabled) $('undo').click();
+    if (e.key === 'ArrowRight' && line.redo.length) play(line.redo.at(-1));
+  });
   $('view').addEventListener('change', render);
+  $('hints').addEventListener('change', render);
   svg.addEventListener('mouseleave', () => { hover = -1; drawHover(); });
 }
 

@@ -10,6 +10,7 @@
 <body>
 <header>
   <h1>Snaky 15 × 15 <span class="sub">play White against a proof</span></h1>
+  <a class="repo" href="https://github.com/gotrevor/snaky-15x15">proof &amp; code on GitHub</a>
 </header>
 
 <main>
@@ -23,7 +24,7 @@
 
     <div class="buttons">
       <button id="new">New game</button>
-      <button id="undo">Take back</button>
+      <button id="undo" title="Take back (← key; → replays)">Take back</button>
     </div>
     <label class="toggle"><input type="checkbox" id="view"> Show the proof's view</label>
     <ul id="view-help" class="help" hidden>
@@ -31,6 +32,14 @@
         A move outside the shaded region gets the card's "pass" answer, as if you hadn't moved.</li>
       <li><span class="key key-a"></span> Black stones the card is built on.</li>
       <li><span class="key key-p"></span> Black's answer to the cell under your pointer.</li>
+    </ul>
+
+    <label class="toggle"><input type="checkbox" id="hints"> White hints</label>
+    <ul id="hints-help" class="help" hidden>
+      <li id="hints-best"></li>
+      <li id="hints-legend">Big number: Black moves you give up against your best move.  Small: the most moves
+        Black's strategy can still need after you play there.  Green 0, amber 1-2, red 3+.</li>
+      <li id="hints-pass"></li>
     </ul>
 
     <ol id="moves" class="moves"></ol>
@@ -54,7 +63,10 @@
     plays here, and Black wins within <i>h</i> moves".  Each White reply sends Black to a card of
     lower height, under a rotation, reflection or shift.  A Lean proof,
     <code>Snaky.snaky_wins_15x15</code>, checks the whole card set in the kernel, and this page
-    plays the same file.  The "promise" counter is the current card's height.
+    plays the same file.  The "promise" counter is the current card's height.  The
+    certificate, the Lean proof and the full write-up are in
+    <a href="https://github.com/gotrevor/snaky-15x15">gotrevor/snaky-15x15</a>
+    (<a href="https://github.com/gotrevor/snaky-15x15/blob/main/docs/notes/snaky.md">the note</a>).
   </p>
   <p>
     Frank Harary asked which polyominoes the first player can force; Snaky was the one hexomino
