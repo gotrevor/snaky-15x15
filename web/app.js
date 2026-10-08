@@ -238,6 +238,10 @@ async function main() {
 
   $('new').addEventListener('click', () => newGame());
   $('undo').addEventListener('click', () => newGame(whiteMoves().slice(0, -1)));
+  // The left-arrow key is "Take back", as in ninepaths.
+  addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft' && !e.altKey && !e.metaKey && !e.ctrlKey && !$('undo').disabled) $('undo').click();
+  });
   $('view').addEventListener('change', render);
   $('hints').addEventListener('change', render);
   svg.addEventListener('mouseleave', () => { hover = -1; drawHover(); });
