@@ -1,5 +1,7 @@
 # Snaky is a first-player win on 15 × 15
 
+**▶ Play it: [snaky.gotrevor.org](https://snaky.gotrevor.org)** - you take White against Black's proved strategy, with move hints and a view of the proof's cards.
+
 In Harary's achievement game for the Snaky hexomino (weak / maker-breaker version), the first
 player wins on the empty 15 × 15 board, the board size in Harary's conjecture (OpenAI proved the
 plane win in Lean in 2026; see `docs/notes/snaky.md`).  The evidence is an explicit
