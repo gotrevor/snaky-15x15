@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snaky 15 × 15: play White against a proof</title>
+<meta name="description" content="Try to stop Black from building the Snaky hexomino on a 15 × 15 board. Black plays a strategy whose win is proved in Lean.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Snaky 15 × 15 <span class="sub">play White against a proof</span></h1>
+</header>
+
+<main>
+  <section class="board-wrap">
+    <svg id="board" role="grid" aria-label="15 by 15 board"></svg>
+  </section>
+
+  <aside class="panel">
+    <div id="status" class="status" aria-live="polite">Loading Black's strategy…</div>
+    <div id="bound" class="bound"></div>
+
+    <div class="buttons">
+      <button id="new">New game</button>
+      <button id="undo">Take back</button>
+    </div>
+    <label class="toggle"><input type="checkbox" id="view"> Show the proof's view</label>
+    <ul id="view-help" class="help" hidden>
+      <li><span class="key key-s"></span> Black's current card answers a move here specifically.
+        A move outside the shaded region gets the card's "pass" answer, as if you hadn't moved.</li>
+      <li><span class="key key-a"></span> Black stones the card is built on.</li>
+      <li><span class="key key-p"></span> Black's answer to the cell under your pointer.</li>
+    </ul>
+
+    <ol id="moves" class="moves"></ol>
+  </aside>
+</main>
+
+<section class="about">
+  <h2>The game</h2>
+  <div class="rules">
+    <svg id="shape" class="shape" viewBox="0 0 5 2" aria-label="the Snaky hexomino"></svg>
+    <p>
+      Black and White take turns claiming cells.  Black wins by owning all six cells of a
+      <b>Snaky</b>, the hexomino on the left, in any rotation or reflection.  White wins by
+      stopping that until the board is full; White's own shapes don't count.  Black moves first.
+      You are White.
+    </p>
+  </div>
+  <p>
+    Black can't lose.  It is not searching: every Black move comes from a fixed set of 8,671
+    <i>cards</i>.  A card says "Black owns these cells, White has nothing in this region, Black
+    plays here, and Black wins within <i>h</i> moves".  Each White reply sends Black to a card of
+    lower height, under a rotation, reflection or shift.  A Lean proof,
+    <code>Snaky.snaky_wins_15x15</code>, checks the whole card set in the kernel, and this page
+    plays the same file.  The "promise" counter is the current card's height.
+  </p>
+  <p>
+    Frank Harary asked which polyominoes the first player can force; Snaky was the one hexomino
+    left open, and Harary conjectured a first-player win on 15 × 15.  Halupczok and
+    Schlage-Puchta showed Snaky loses on 8 × 8 and wins on the plane with a one-stone handicap
+    (2007).  In 2026 OpenAI gave a 21-move win on the infinite board, proved in Lean, and derived
+    a win on 17 × 17.
+  </p>
+  <p class="byline">
+    [ Page, strategy and proof machine-produced by Claude (Anthropic) at Trevor Morris's
+    direction. ]
+  </p>
+  <p class="byline" id="provenance"></p>
+</section>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
