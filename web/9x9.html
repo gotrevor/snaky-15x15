@@ -42,19 +42,18 @@
     <div id="play-panel" hidden>
       <div id="status" class="status" aria-live="polite"></div>
       <div id="why" class="bound"></div>
+      <div id="hint-head" class="hint-head"></div>
       <div class="buttons">
         <button id="new">New game</button>
         <button id="undo" title="Take back your last move">Take back</button>
       </div>
       <label class="toggle"><input type="checkbox" id="bhints" checked> Black hints</label>
       <ul id="hints-help" class="help" hidden>
-        <li id="hints-best"></li>
         <li id="hints-legend">Big number: Black moves you give up against your best known move.  Small: the most
           Black moves White's proof can still need after you play there, before every line ends
           in a pairing.  Green 0, amber 1-2, red 3+.</li>
         <li id="hints-q"><span class="key key-q">?</span> An unknown path: no proof covers this
           move yet.  You can play it, but from there White only guesses.</li>
-        <li id="hints-pass"></li>
       </ul>
       <label class="toggle"><input type="checkbox" id="pairs" checked> Show White's pairing</label>
       <p id="pairs-help" class="help">At a pairing, every Snaky that could still fit contains one
