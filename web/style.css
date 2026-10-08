@@ -147,3 +147,4 @@ nav.repo a { color: inherit; }
 .key-q { width: auto; height: auto; padding: 0 0.3em; color: #7a4fb0; font-weight: 700; border: 1px dashed #7a4fb0; border-radius: 50%; }
 svg.offproof .cell { fill: #ddd2e8; }
 svg.offproof .cell.playable:hover { fill: #e9e1f1; }
+.hint-dot.hint-good { fill: var(--good); fill-opacity: 0.85; }

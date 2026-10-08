@@ -270,7 +270,8 @@ function setStatus(a, b) { $('status').textContent = a; $('why').textContent = b
 
 // Black hints, as the 15 x 15 page's White hints: a disc ringed green / amber / red, the big
 // number the moves given up against Black's best known move, the small one the most Black moves
-// White's proof can still need after that move.  Cells with the most common value stay unmarked.
+// White's proof can still need after that move.  Cells with the most common value stay
+// unmarked, except that a best move is never blank: then they get a green dot.
 // "?" marks an unknown path (no proof yet), "!" a Black win, a dot a dead cell.
 const lossClass = (loss) => (loss === 0 ? 'good' : loss < 3 ? 'hot' : 'bad');
 
@@ -308,7 +309,10 @@ function drawHints(hints) {
     } else if (h.kind === 'win') {
       el('circle', { cx, cy, r: 0.42, class: 'hint-disc hint-bad' }, g);
       el('text', { x: cx, y: cy + 0.02, class: 'hint-lost' }, g).textContent = '!';
-    } else if (h.value !== common) {
+    } else if (h.value === common) {
+      // A best move is never left blank: when the common value is the best, each gets a green dot.
+      if (common === best) el('circle', { cx, cy, r: 0.14, class: 'hint-dot hint-good' }, g);
+    } else {
       el('circle', { cx, cy, r: 0.42, class: `hint-disc hint-${lossClass(best - h.value)}` }, g);
       el('text', { x: cx, y: cy - 0.05, class: 'hint-loss' }, g).textContent = String(best - h.value);
       el('text', { x: cx, y: cy + 0.25, class: 'hint-left' }, g).textContent = String(h.value);
@@ -333,7 +337,7 @@ function hintText(hints) {
     head = `Your best ${unknown ? 'known ' : ''}moves (green, 0) keep White's proof going for up to ${best} more Black moves.`;
   } else head = '';
   const rest = best === null || best === 0 || (view && view.kind === 'pave') ? '' : best === common
-    ? 'Every unmarked cell is a best move too.'
+    ? 'Every dotted cell is a best move too (green dot).'
     : `Every unmarked cell gives up ${best - common} (White's proof needs up to ${common} more).`;
   return { head, rest, unknown: unknown && !(play && play.unknown), values: best !== null && best > 0 };
 }
