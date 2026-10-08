@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Verify the 15x15 Snaky certificate: check the archive's sha256, unpack it into build/, and run
-the independent checker on the root certificate (about 12 minutes, one core, stdlib only)."""
+the independent checker on the root certificate (about 18 minutes, one core, ~20 GB, stdlib only)."""
 import hashlib
 import os
 import subprocess

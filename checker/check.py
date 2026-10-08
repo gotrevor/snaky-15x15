@@ -17,8 +17,12 @@ Rules used (each must become a Lean lemma; see docs/PLAN.md):
                       cells, union of live placements) to itself, a child for g(c) covers c.
   R4 paving         : disjoint free pairs, every live placement contains a pair  =>  White wins.
   R5 zone           : a Black win T from Q stays a win after extra White stones outside
-                      supp(T) (all cells T mentions).  So at a White node, moves outside the
-                      zone Z are covered by the "pass" child when Z >= supp(pass) & free.
+                      supp(T), every cell T's strategy plays or answers.  So at a White node,
+                      moves outside the zone Z are covered by the "pass" child when
+                      Z >= supp(pass) & free.  supp is taken from the strategy as checked at its
+                      position: a reply w covered by R3 through g is answered by the mirror image
+                      of the child for g(w), so it contributes g^-1(supp(child)), cells the
+                      listed children need not mention.
 
 Certificate (JSON, "format": "snaky-cert-v1"): "nodes" is a list, children are node indices.
  claim "white" (Black to move at every node):
@@ -113,8 +117,7 @@ class Checker:
         self.placements = all_placements(self.rows, self.cols, cert["shape"])
         self.syms = board_symmetries(self.rows, self.cols)
         self.nodes = cert["nodes"]
-        self.done = set()
-        self.supp_memo = {}
+        self.done = {}
         self.checked = 0
 
     def node(self, i):
@@ -125,14 +128,14 @@ class Checker:
         return [p for p in self.placements if not (p & white)]
 
     def symmetric_cover(self, black, white, c, covered):
-        """R3: some symmetry fixing the normalized position maps c into `covered`."""
+        """R3: a symmetry fixing the normalized position that maps c into `covered`, or None."""
         live = self.live(white)
         U = set().union(*live) if live else set()
         Bn = black & U
         for g in self.syms:
             if {g[x] for x in U} == U and {g[x] for x in Bn} == Bn and g[c] in covered:
-                return True
-        return False
+                return g
+        return None
 
     # ---- claim "white" ----------------------------------------------------------------------
     def white_node(self, i, black, white):
@@ -173,37 +176,15 @@ class Checker:
                     continue                        # R2
                 if c in moves:
                     continue
-                require(self.symmetric_cover(black, white, c, set(moves)),
+                require(self.symmetric_cover(black, white, c, set(moves)) is not None,
                         f"node {i}: no answer to Black move {c}")
             for b, (w, child) in moves.items():
                 nb = black | {b}
                 nw = white | ({w} if w is not None else set())
                 self.white_node(child, frozenset(nb), frozenset(nw))
-        self.done.add(key)
+        self.done[key] = None
 
     # ---- claim "black" ----------------------------------------------------------------------
-    def supp(self, i, stack=()):
-        if i in self.supp_memo:
-            return self.supp_memo[i]
-        require(i not in stack, f"cycle through node {i}")
-        stack = stack + (i,)
-        n = self.node(i)
-        if "cite" in n:
-            s = set(self.cite_supp(n))
-        elif "play" in n:
-            s = {n["play"]} | self.supp(n["next"], stack)
-        elif "won" in n:
-            s = set(n["won"])
-        else:
-            require("zone" in n, f"node {i}: unknown node kind")
-            s = set(n["zone"])
-            for w, child in n["replies"]:
-                s |= self.supp(child, stack)
-            if n.get("pass") is not None:
-                s |= self.supp(n["pass"], stack)
-        self.supp_memo[i] = frozenset(s)
-        return self.supp_memo[i]
-
     def load_cited(self, n):
         import hashlib
         require(isinstance(n.get("cite"), str), "cite must be a path")
@@ -219,52 +200,49 @@ class Checker:
                 f"{path}: different board or shape")
         return path, sub
 
-    def cite_supp(self, n):
-        path, sub = self.load_cited(n)
-        ch = Checker(sub, os.path.dirname(path), self.verified, self.stats)
-        return ch.supp(sub["root"])
-
     def check_cite(self, n, black, white):
         path, sub = self.load_cited(n)
         require(frozenset(sub["black"]) == black and frozenset(sub["white"]) == white,
                 f"{path}: start position differs from the citing position")
         key = (path, black, white)
         if key in self.verified:
-            return
+            return self.verified[key]
         ch = Checker(sub, os.path.dirname(path), self.verified, self.stats)
-        ch.black_node(sub["root"], black, white)
+        s = ch.black_node(sub["root"], black, white)
         self.stats["files"] += 1
         self.stats["positions"] += ch.checked
-        self.verified[key] = True
+        self.verified[key] = s
+        return s
 
     def black_node(self, i, black, white):
+        """Check that Black to move wins from (black, white) by node i; return the strategy's supp."""
         key = ("B", i, black, white)
         if key in self.done:
-            return
+            return self.done[key]
         self.checked += 1
         n = self.node(i)
         if "cite" in n:
-            self.check_cite(n, black, white)
-            self.done.add(key)
-            return
-        require("play" in n, f"node {i}: expected a Black node")
-        b = n["play"]
-        require(b in self.cells - black - white, f"node {i}: Black move {b} not free")
-        self.white_node_b(n["next"], frozenset(black | {b}), white)
-        self.done.add(key)
+            s = self.check_cite(n, black, white)
+        else:
+            require("play" in n, f"node {i}: expected a Black node")
+            b = n["play"]
+            require(b in self.cells - black - white, f"node {i}: Black move {b} not free")
+            s = frozenset({b}) | self.white_node_b(n["next"], frozenset(black | {b}), white)
+        self.done[key] = s
+        return s
 
     def white_node_b(self, i, black, white):
         key = ("W", i, black, white)
         if key in self.done:
-            return
+            return self.done[key]
         self.checked += 1
         n = self.node(i)
         if "won" in n:
             s = frozenset(n["won"])
             require(s in self.placements, f"node {i}: 'won' cells are not a placement")
             require(s <= black, f"node {i}: 'won' placement not all Black")
-            self.done.add(key)
-            return
+            self.done[key] = s
+            return s
         require("zone" in n, f"node {i}: expected a White node")
         free = self.cells - black - white
         require(free, f"node {i}: board full and Black has not won")
@@ -275,19 +253,33 @@ class Checker:
             require(w in zone, f"node {i}: reply {w} outside zone")
             require(w not in replies, f"node {i}: duplicate reply {w}")
             replies[w] = child
+        covers = {}
         for w in sorted(zone):
             if w not in replies:
-                require(self.symmetric_cover(black, white, w, set(replies)),
-                        f"node {i}: no answer to White move {w}")
+                g = self.symmetric_cover(black, white, w, set(replies))
+                require(g is not None, f"node {i}: no answer to White move {w}")
+                covers[w] = g
+        s = set(zone)
         if n.get("pass") is None:
             require(zone == free, f"node {i}: no pass child but zone != all free cells")
         else:
-            need = self.supp(n["pass"]) & free
+            sp = self.black_node(n["pass"], black, white)
+            need = sp & free
             require(need <= zone, f"node {i}: zone misses {sorted(need - zone)} of supp(pass)")
-            self.black_node(n["pass"], black, white)
+            s |= sp
+        sub = {}
         for w, child in replies.items():
-            self.black_node(child, black, frozenset(white | {w}))
-        self.done.add(key)
+            sub[w] = self.black_node(child, black, frozenset(white | {w}))
+            s |= sub[w]
+        for w, g in covers.items():
+            inv = {v: k for k, v in g.items()}
+            mirrored = {inv[x] for x in sub[g[w]]}
+            if mirrored - s:
+                self.stats["mirror_widened"] = self.stats.get("mirror_widened", 0) + 1
+            s |= mirrored
+        s = frozenset(s)
+        self.done[key] = s
+        return s
 
     def run(self):
         c = self.cert
@@ -318,8 +310,10 @@ def main():
         sys.exit(1)
     cited = (f", plus {ch.stats['files'] - 1} cited files / {ch.stats['positions']} node-positions"
              if ch.stats["files"] > 1 else "")
+    widened = ch.stats.get("mirror_widened", 0)
+    mirrored = f"; {widened} symmetric covers widened a support" if widened else ""
     print(f"VALID {claim} wins {cert['rows']}x{cert['cols']} "
-          f"({ch.checked} node-positions checked, {len(cert['nodes'])} nodes{cited})")
+          f"({ch.checked} node-positions checked, {len(cert['nodes'])} nodes{cited}{mirrored})")
 
 
 if __name__ == "__main__":
