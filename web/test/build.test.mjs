@@ -13,7 +13,7 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 test('build-web: every asset reference carries the hash of the file it names', () => {
   const out = mkdtempSync(join(tmpdir(), 'snaky-web-'));
-  execFileSync(join(ROOT, 'tools/build-web'), [out], { stdio: 'pipe' });
+  execFileSync('python3', [join(ROOT, 'tools/build-web'), out], { stdio: 'pipe' });  // stdlib only; CI has no uv
   const files = readdirSync(out).filter((f) => /\.(html|js|css)$/.test(f));
   let refs = 0;
   for (const f of files) {
