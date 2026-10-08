@@ -123,7 +123,8 @@ let hoverLayer = null;
 // number the moves it gives up against White's best, the small one the most Black moves the
 // strategy can still need.  Most cells share one value (everything outside the card's region
 // gets the pass answer, and the opening card's region is nearly the whole board), so cells with
-// the most common value stay unmarked and only the cells that differ get a disc.  Black's
+// the most common value stay unmarked (a green dot if that value is the best) and only the cells
+// that differ get a disc.  Black's
 // threats override: one is a forced move ("!"), two or more a forced loss ("✕" on each).
 const lossClass = (loss) => (loss === 0 ? 'good' : loss < 3 ? 'hot' : 'bad');
 
@@ -156,7 +157,11 @@ function drawHints() {
       el('text', { x: cx, y: cy + 0.25, class: 'hint-left' }, g).textContent = String(value);
       continue;
     }
-    if (value === common) continue;
+    if (value === common) {
+      // A best move is never left blank: when the common value is the best, each gets a green dot.
+      if (loss === 0) el('circle', { cx, cy, r: 0.14, class: 'hint-dot hint-good' }, g);
+      continue;
+    }
     el('circle', { cx, cy, r: 0.42, class: `hint-disc hint-${lossClass(loss)}` }, g);
     el('text', { x: cx, y: cy - 0.05, class: 'hint-loss' }, g).textContent = String(loss);
     el('text', { x: cx, y: cy + 0.25, class: 'hint-left' }, g).textContent = String(value);
@@ -202,7 +207,7 @@ function renderPanel() {
     $('hints-pass').textContent = threats.length >= 2 ? '' : common === 1
       ? 'Anywhere else, Black wins next move.'
       : commonLoss === 0
-        ? 'Every unmarked cell is a best move too.'
+        ? 'Every dotted cell is a best move too (green dot).'
         : `Every unmarked cell gives up ${commonLoss} (Black needs up to ${common}).`;
     $('hints-legend').hidden = threats.length >= 2;
   }
