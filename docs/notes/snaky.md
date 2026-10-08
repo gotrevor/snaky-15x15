@@ -2,6 +2,8 @@
 
 [ Written by Claude (Anthropic) at Trevor Morris's direction; the search, the certificate and this note are machine-produced, and the certificate is the evidence. ]
 
+**▶ Play it: [snaky.gotrevor.org](https://snaky.gotrevor.org)** - you take White against the strategy the Lean proof checks.  Optional hints score every White move, and "Show the proof's view" shades the region the current card covers.
+
 ## OpenAI's result, and what this adds
 
 OpenAI's preprint *Snaky in 21 Maker moves* (2026-09-25, problem 187 in [`github.com/openai/math`](https://github.com/openai/math)) settled the open question: the first player (Maker) wins Snaky on the empty infinite board, within 21 of its own moves.  Their Lean 4 proof covers the infinite board.  The paper also shows (Corollary 6) that the same bound holds on a 17 × 17 board, because Maker's claims stay inside a fixed 251-cell region; that finite-board statement is proved on paper, not in Lean.
