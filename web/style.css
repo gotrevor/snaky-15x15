@@ -148,3 +148,8 @@ nav.repo a { color: inherit; }
 svg.offproof .cell { fill: #ddd2e8; }
 svg.offproof .cell.playable:hover { fill: #e9e1f1; }
 .hint-head { font-size: 0.95rem; margin-bottom: 0.75rem; }
+.under-board { margin: 0.5rem 0 0; }
+svg.allbest .cell { fill: #cfe3c4; }
+svg.allbest .cell.playable:hover { fill: #e0eed8; }
+/* 9 x 9: keep the board and the buttons under it inside the window. */
+body.nine .board-wrap { max-width: min(680px, calc(100vh - 150px)); }

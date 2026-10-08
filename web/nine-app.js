@@ -328,9 +328,9 @@ function hintText(hints) {
       ? 'White holds a pairing (the linked cells): it answers every move, so every move scores 0.'
       : 'White holds a pairing: it answers every move, so every move scores 0 (green).';
   } else if (best === 0) {
-    head = 'Whatever you play, White\'s reply reaches a pairing: every move scores 0 (green).';
+    head = 'The proof ends after your next move (green board): whatever you play, White\'s reply reaches a pairing.';
   } else if (marks && marks.uniform) {
-    head = `Every move is a best move (green): White's proof needs up to ${best} more Black moves whatever you play.`;
+    head = `Every move scores the same (green board): White's proof needs up to ${best} more Black moves whatever you play.`;
   } else if (best !== null) {
     head = `Your best ${unknown ? 'known ' : ''}moves (green, 0) keep White's proof going for up to ${best} more Black moves.`;
   } else head = '';
@@ -372,7 +372,11 @@ function drawPlay() {
   }
   // At a drawn pairing the pairs are the answer to every move; discs would cover them.
   const paired = play && play.view() && play.view().kind === 'pave' && $('pairs').checked;
-  if (showHints && !paired) drawHints(hints);
+  // When every move is a best move, a green board says it instead of a disc on every cell.
+  const sum = showHints && !paired ? hintSummary(hints) : null;
+  const allBest = !!(sum && sum.marks && sum.marks.uniform && !(play && play.unknown));
+  svg.classList.toggle('allbest', allBest);
+  if (showHints && !paired && !allBest) drawHints(hints);
   const t = showHints ? hintText(hints) : null;
   $('hints-help').hidden = !t;
   $('hint-head').textContent = t ? [t.head, t.rest].filter(Boolean).join('  ') : '';
@@ -403,6 +407,7 @@ function setMode(m) {
   $('tab-play').setAttribute('aria-selected', String(m === 'play'));
   $('progress-panel').hidden = m !== 'progress';
   $('play-panel').hidden = m !== 'play';
+  $('play-buttons').hidden = m !== 'play';
   if (m === 'play' && !play) setStatus(FIRST, '');
   render();
 }
