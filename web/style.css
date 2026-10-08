@@ -21,7 +21,8 @@ body {
   background: var(--bg);
 }
 
-header { padding: 1rem 1.25rem 0; }
+header { padding: 1rem 1.25rem 0; display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+.repo { color: var(--muted); font-size: 0.95rem; }
 h1 { margin: 0; font-size: 1.5rem; }
 h1 .sub { font-weight: 400; color: var(--muted); font-size: 1rem; margin-left: 0.5rem; }
 h2 { font-size: 1.15rem; margin: 0 0 0.5rem; }
