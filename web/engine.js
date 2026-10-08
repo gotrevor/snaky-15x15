@@ -279,15 +279,15 @@ export class Line {
 // Which hint values get a disc (both pages).  Higher value = better move.  The best value always
 // does, and so does every value better than the most common one (ties: the lower value counts as
 // most common); the most common value and everything worse stay unmarked - the worst moves,
-// usually most of the board.  When every move scores the same, nothing is marked (the legend
-// says so).  hiddenLoss is the smallest loss among unmarked cells, or null if none is unmarked.
+// usually most of the board.  When every move scores the same, every move is a best move and
+// all are marked.  hiddenLoss is the smallest loss among unmarked cells, or null if none is.
 export function hintMarks(values) {
   const best = Math.max(...values);
-  if (values.every((v) => v === best)) return { best, show: () => false, hiddenLoss: null, uniform: true };
   const count = new Map();
   for (const v of values) count.set(v, (count.get(v) || 0) + 1);
   const common = [...count].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0][0];
   const show = (v) => v === best || v > common;
   const hidden = values.filter((v) => !show(v));
-  return { best, show, hiddenLoss: hidden.length ? best - Math.max(...hidden) : null, uniform: false };
+  return { best, show, hiddenLoss: hidden.length ? best - Math.max(...hidden) : null,
+    uniform: values.every((v) => v === best) };
 }

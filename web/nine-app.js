@@ -324,17 +324,19 @@ function hintText(hints) {
     head = wins.length ? `Off the proof: Black wins at ${wins.join(' or ')} (!).`
       : 'Off the proof (purple board): every move here is an unknown path.';
   } else if (view && view.kind === 'pave') {
-    head = 'White holds a pairing: every move scores 0, and the pairing answers it.';
+    head = $('pairs').checked
+      ? 'White holds a pairing (the linked cells): it answers every move, so every move scores 0.'
+      : 'White holds a pairing: it answers every move, so every move scores 0 (green).';
   } else if (best === 0) {
-    head = 'Whatever you play, White\'s reply reaches a pairing: every move scores 0.';
+    head = 'Whatever you play, White\'s reply reaches a pairing: every move scores 0 (green).';
   } else if (marks && marks.uniform) {
-    head = `Every move scores the same: White's proof needs up to ${best} more Black moves whatever you play.`;
+    head = `Every move is a best move (green): White's proof needs up to ${best} more Black moves whatever you play.`;
   } else if (best !== null) {
     head = `Your best ${unknown ? 'known ' : ''}moves (green, 0) keep White's proof going for up to ${best} more Black moves.`;
   } else head = '';
-  const rest = !marks || marks.uniform || (view && view.kind === 'pave') ? ''
-    : marks.hiddenLoss === null ? '' : `Every unmarked cell gives up ${marks.hiddenLoss} or more.`;
-  return { head, rest, unknown: unknown && !(play && play.unknown), values: best !== null && best > 0 };
+  const rest = !marks || marks.hiddenLoss === null || (view && view.kind === 'pave') ? ''
+    : `Every unmarked cell gives up ${marks.hiddenLoss} or more.`;
+  return { head, rest, unknown: unknown && !(play && play.unknown), values: best !== null };
 }
 
 function drawPlay() {
@@ -368,12 +370,13 @@ function drawPlay() {
       el('circle', { cx, cy, r: 0.18, class: 'last', 'pointer-events': 'none' }, svg);
     }
   }
-  if (showHints) drawHints(hints);
+  // At a drawn pairing the pairs are the answer to every move; discs would cover them.
+  const paired = play && play.view() && play.view().kind === 'pave' && $('pairs').checked;
+  if (showHints && !paired) drawHints(hints);
   const t = showHints ? hintText(hints) : null;
   $('hints-help').hidden = !t;
+  $('hint-head').textContent = t ? [t.head, t.rest].filter(Boolean).join('  ') : '';
   if (t) {
-    $('hints-best').textContent = t.head;
-    $('hints-pass').textContent = t.rest;
     $('hints-q').hidden = !t.unknown;
     $('hints-legend').hidden = !t.values;
   }

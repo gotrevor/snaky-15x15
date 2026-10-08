@@ -279,8 +279,9 @@ test('hintMarks: best always marked, plus anything better than the most common; 
   assert.equal(hintMarks([10, 10, 10, 10, 23, 21, 13, 9]).hiddenLoss, 13);
   // A tie for most common: the lower value counts, so the higher one is shown.
   assert.deepEqual(shown([3, 3, 5, 5, 7]), [5, 5, 7]);
-  // Every move the same: nothing marked.
+  // Every move the same: every move is a best move, so all are marked (9 x 9 after c3 e5 f6 f5
+  // g6 d6: all 75 moves score 0, and an earlier rule left the board blank).
   assert.equal(hintMarks([0, 0, 0]).uniform, true);
   assert.equal(hintMarks([0, 0, 0]).hiddenLoss, null);
-  assert.deepEqual(shown([0, 0, 0]), []);
+  assert.deepEqual(shown([0, 0, 0]), [0, 0, 0]);
 });
