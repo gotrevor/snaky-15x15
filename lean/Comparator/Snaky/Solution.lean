@@ -1,4 +1,5 @@
 import Snaky.Result
+import Snaky.Controls
 
 /-!
 # Comparator solution
