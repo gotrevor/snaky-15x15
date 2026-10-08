@@ -239,8 +239,9 @@ function drawShape() {
 
 async function main() {
   drawShape();
-  const resp = await fetch('cards.txt');
-  if (!resp.ok) throw new Error(`cards.txt: HTTP ${resp.status}`);
+  const src = document.body.dataset.cards || 'cards.txt';  // 17x17.html plays Sieben's card set
+  const resp = await fetch(src);
+  if (!resp.ok) throw new Error(`${src}: HTTP ${resp.status}`);
   const text = await resp.text();
   cs = parseCards(text);
   const digest = await crypto.subtle?.digest('SHA-256', new TextEncoder().encode(text));

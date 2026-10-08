@@ -1,5 +1,6 @@
 #!/usr/bin/env -S uv run --quiet python3
-"""Assemble the static site into build/web/: the files in web/ plus the card set as cards.txt.
+"""Assemble the static site into build/web/: the files in web/ plus the card set as cards.txt
+(and Sieben's 17 x 17 card set as cards-17x17.txt).
 The result is plain static files (no server code); upload the directory anywhere, e.g.
 `wrangler pages deploy build/web --project-name snaky`.
 
@@ -21,7 +22,7 @@ import re
 import shutil
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FILES = ["index.html", "style.css", "app.js", "engine.js", "9x9.html", "nine-app.js", "nine.js"]
+FILES = ["index.html", "style.css", "app.js", "engine.js", "9x9.html", "nine-app.js", "nine.js", "17x17.html"]
 # Versioned in this order, so a module's stamp covers the stamps of what it imports.
 ASSETS = ["style.css", "engine.js", "nine.js", "app.js", "nine-app.js"]
 REF = re.compile(r"""(["'])(\./)?([\w.-]+\.(?:js|css))\1""")
@@ -50,7 +51,9 @@ def main():
         with open(os.path.join(out, f), "w", encoding="utf-8") as fh:
             fh.write(text)
     shutil.copyfile(os.path.join(HERE, "cert", "snaky-15x15-cards.txt"), os.path.join(out, "cards.txt"))
-    wrote = FILES + ["cards.txt"]
+    # 17x17.html: Sieben's 20-move proof sequence as cards (third_party/sieben/README.md).
+    shutil.copyfile(os.path.join(HERE, "third_party", "sieben", "cards-17x17.txt"), os.path.join(out, "cards-17x17.txt"))
+    wrote = FILES + ["cards.txt", "cards-17x17.txt"]
     if args.nine:
         snap = json.load(open(os.path.join(args.nine, "progress.json")))
         dest = os.path.join(out, "9x9")

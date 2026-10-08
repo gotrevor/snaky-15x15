@@ -3,21 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Snaky 15 × 15: play White against a proof</title>
-<meta name="description" content="Try to stop Black from building the Snaky hexomino on a 15 × 15 board. Black plays a strategy whose win is proved in Lean.">
+<title>Snaky 17 × 17: play White against Sieben's 20-move strategy</title>
+<meta name="description" content="Try to stop Black from building the Snaky hexomino on a 17 × 17 board. Black plays Nándor Sieben's 20-move proof sequence.">
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body data-cards="cards-17x17.txt">
 <header>
-  <h1>Snaky 15 × 15 <span class="sub">play White against a proof</span></h1>
+  <h1>Snaky 17 × 17 <span class="sub">Sieben's 20-move strategy</span></h1>
   <a class="repo" href="https://github.com/gotrevor/snaky-15x15">proof &amp; code on GitHub</a>
-  <a class="repo" href="9x9.html">9 × 9: the White proof in progress</a>
-  <a class="repo" href="17x17.html">17 × 17: Sieben's 20-move strategy</a>
+  <a class="repo" href="./">15 × 15: the Lean-proved strategy</a>
 </header>
 
 <main>
   <section class="board-wrap">
-    <svg id="board" role="grid" aria-label="15 by 15 board"></svg>
+    <svg id="board" role="grid" aria-label="17 by 17 board"></svg>
   </section>
 
   <aside class="panel">
@@ -60,26 +59,22 @@
     </p>
   </div>
   <p>
-    Black can't lose.  It is not searching: every Black move comes from a fixed set of 8,671
-    <i>cards</i>.  A card says "Black owns these cells, White has nothing in this region, Black
-    plays here, and Black wins within <i>h</i> moves".  Each White reply sends Black to a card of
-    lower height, under a rotation, reflection or shift.  A Lean proof,
-    <code>Snaky.snaky_wins_15x15</code>, checks the whole card set in the kernel, and this page
-    plays the same file.  The "promise" counter is the current card's height.  The
-    certificate, the Lean proof and the full write-up are in
-    <a href="https://github.com/gotrevor/snaky-15x15">gotrevor/snaky-15x15</a>
-    (<a href="https://github.com/gotrevor/snaky-15x15/blob/main/docs/notes/snaky.md">the note</a>).
+    Black plays Nándor Sieben's <i>proof sequence</i> for Snaky (October 2026,
+    <a href="https://github.com/nandorsieben/Snaky">nandorsieben/Snaky</a>), built from the
+    strategies in OpenAI's <i>Snaky in 21 Maker moves</i>.  It wins within <b>20</b> Black
+    moves, one fewer than OpenAI's 21, and every Black stone and every cell it relies on lies in a
+    251-cell region that fits a 17 × 17 board.
   </p>
   <p>
-    Frank Harary asked which polyominoes the first player can force; Snaky was the one hexomino
-    left open, and Harary conjectured a first-player win on 15 × 15.  Halupczok and
-    Schlage-Puchta showed Snaky loses on 8 × 8 and wins on the plane with a one-stone handicap
-    (2007).  In 2026 OpenAI gave a 21-move win on the infinite board, proved in Lean, and derived
-    a win on 17 × 17.
+    For this page his 1,510 situations were converted into 1,738 <i>cards</i> in the format of
+    the <a href="./">15 × 15 page</a>: "Black owns these cells, White has nothing in this region,
+    Black plays here, and Black wins within <i>h</i> moves".  The card checker from the 15 × 15
+    Lean proof (<code>cardcheck</code>, the same checker compiled) accepts the converted set
+    on 17 × 17.  The "promise" counter is the current card's height.
   </p>
   <p class="byline">
-    [ Page, strategy and proof machine-produced by Claude (Anthropic) at Trevor Morris's
-    direction. ]
+    [ Strategy by Nándor Sieben.  Page and card conversion machine-produced by Claude
+    (Anthropic) at Trevor Morris's direction. ]
   </p>
   <p class="byline" id="provenance"></p>
 </section>
