@@ -185,6 +185,21 @@ export class Game {
     return c.pass;
   }
 
+  // White hints: for every empty cell, the most Black moves the strategy can still need after
+  // White plays there - the next card's height, which equals the longest line through the card
+  // graph (a test checks this for every card).  `zone` marks cells in G(S); the rest all take
+  // the pass hint, so they share one value.
+  whiteValues() {
+    const c = this.card();
+    const out = [];
+    this.board.forEach((v, cell) => {
+      if (v !== EMPTY) return;
+      const [x, y] = unapp(this.G, this.xy(cell));
+      out.push({ cell, value: getCard(this.cs, this.hintFor(cell).j).h, zone: c.Sset.has(key(x, y)) });
+    });
+    return out;
+  }
+
   // Where Black would answer a White move at the empty `cell`, without playing it (-1 if the
   // answer would be "any free cell").
   answerTo(cell) {

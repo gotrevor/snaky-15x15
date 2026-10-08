@@ -182,3 +182,38 @@ test('the board never holds both colours on a cell, and stones alternate', () =>
   g.history.forEach((m, i) => assert.equal(m.color, i % 2 === 0 ? BLACK : WHITE));
   assert.equal(new Set(g.history.map((m) => m.cell)).size, g.history.length);
 });
+
+// White hints.
+
+test('every card height is exactly its longest line: 1 + the tallest hinted card (1 if none)', () => {
+  for (let j = 0; j < cs.lines.length; j++) {
+    const c = getCard(cs, j);
+    const kids = [...c.replies.values(), ...(c.pass ? [c.pass] : [])].map((h) => getCard(cs, h.j).h);
+    assert.equal(c.h, kids.length ? 1 + Math.max(...kids) : 1, `card ${j}`);
+  }
+});
+
+test('opening hints: the four cells touching h8 are White\'s best, 24; most cells are 15', () => {
+  const vals = new Game(cs).whiteValues();
+  assert.equal(vals.length, 224);
+  const best = Math.max(...vals.map((v) => v.value));
+  assert.equal(best, 24);
+  assert.deepEqual(vals.filter((v) => v.value === 24).map((v) => label(15, v.cell)).sort(),
+    ['g8', 'h7', 'h9', 'i8']);
+  const fifteen = vals.filter((v) => v.value === 15).length;
+  assert.ok(fifteen > 150, `expected most cells at 15, got ${fifteen}`);
+});
+
+test('a hint value is what the counter shows after playing it, and never beats bound - 1', () => {
+  const r = rng(4);
+  for (let n = 0; n < 200; n++) {
+    const g = new Game(cs);
+    while (!g.won) {
+      const vals = g.whiteValues();
+      assert.ok(Math.max(...vals.map((v) => v.value)) <= g.bound() - 1);
+      const pick = vals[Math.floor(r() * vals.length)];
+      g.whiteMove(pick.cell);
+      if (!g.won) assert.equal(g.bound(), pick.value);
+    }
+  }
+});

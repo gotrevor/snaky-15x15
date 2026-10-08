@@ -94,6 +94,7 @@ function render() {
       el('circle', { cx, cy, r: 0.3, class: 'ring-a' }, svg);
     }
   }
+  if ($('hints').checked && !game.won) drawHints();
   hoverLayer = el('g', { 'pointer-events': 'none' }, svg);
   drawHover();
 
@@ -116,6 +117,38 @@ function render() {
 }
 
 let hoverLayer = null;
+
+// White hints, drawn like ninepaths' candidates: a White disc ringed green / amber / red, the big
+// number the moves it gives up against White's best, the small one the most Black moves the
+// strategy can still need.  Most cells share one value (everything outside the card's region
+// gets the pass answer, and the opening card's region is nearly the whole board), so the most
+// common value is a small dot and only the cells that differ get a labelled disc.
+const lossClass = (loss) => (loss === 0 ? 'good' : loss < 3 ? 'hot' : 'bad');
+
+function hintSummary() {
+  const vals = game.whiteValues();
+  const best = Math.max(...vals.map((v) => v.value));
+  const count = new Map();
+  for (const v of vals) count.set(v.value, (count.get(v.value) || 0) + 1);
+  const common = [...count].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0][0];
+  return { vals, best, common, commonLoss: best - common };
+}
+
+function drawHints() {
+  const { vals, best, common } = hintSummary();
+  const g = el('g', { 'pointer-events': 'none' }, svg);
+  for (const { cell, value } of vals) {
+    const loss = best - value;
+    const [cx, cy] = centre(cell);
+    if (value === common) {
+      el('circle', { cx, cy, r: 0.1, class: `hint-dot hint-${lossClass(loss)}` }, g);
+      continue;
+    }
+    el('circle', { cx, cy, r: 0.42, class: `hint-disc hint-${lossClass(loss)}` }, g);
+    el('text', { x: cx, y: cy - 0.05, class: 'hint-loss' }, g).textContent = String(loss);
+    el('text', { x: cx, y: cy + 0.25, class: 'hint-left' }, g).textContent = String(value);
+  }
+}
 
 // Black's answer to the cell under the pointer (proof's view only); redraws one layer, not the board.
 function drawHover() {
@@ -143,6 +176,15 @@ function renderPanel() {
   }
   $('undo').disabled = whiteMoves().length === 0;
   $('view-help').hidden = !$('view').checked;
+  const showHints = $('hints').checked && !game.won;
+  $('hints-help').hidden = !showHints;
+  if (showHints) {
+    const { best, common, commonLoss } = hintSummary();
+    $('hints-best').textContent = `Your best moves (green, 0) leave Black needing up to ${best} more.`;
+    $('hints-pass').textContent = commonLoss === 0
+      ? 'Every dotted cell is a best move too.'
+      : `Every dotted cell gives up ${commonLoss} (Black needs up to ${common}).`;
+  }
 
   const ol = $('moves');
   ol.replaceChildren();
@@ -188,13 +230,16 @@ async function main() {
     $('provenance').textContent = `Card set: ${cs.lines.length} cards, sha256 ${hex}.`;
   }
 
-  if (new URLSearchParams(location.search).has('view')) $('view').checked = true;
+  const params = new URLSearchParams(location.search);
+  if (params.has('view')) $('view').checked = true;
+  if (params.has('hints')) $('hints').checked = true;
   const whites = location.hash.slice(1).split('-').filter(Boolean).map((s) => parseLabel(cs.cols, s));
   newGame(whites.every((c) => c >= 0) ? whites : []);
 
   $('new').addEventListener('click', () => newGame());
   $('undo').addEventListener('click', () => newGame(whiteMoves().slice(0, -1)));
   $('view').addEventListener('change', render);
+  $('hints').addEventListener('change', render);
   svg.addEventListener('mouseleave', () => { hover = -1; drawHover(); });
 }
 
