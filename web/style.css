@@ -97,9 +97,8 @@ code { font-size: 0.9em; }
 .hint-disc.hint-good { stroke: var(--good); }
 .hint-disc.hint-hot { stroke: var(--hot); }
 .hint-disc.hint-bad { stroke: var(--bad); }
-.hint-dot { fill-opacity: 0.55; }
-.hint-dot.hint-good { fill: var(--good); }
-.hint-dot.hint-hot { fill: var(--hot); }
-.hint-dot.hint-bad { fill: var(--bad); }
+.hint-disc.hint-forced { stroke: #1f4fc4; stroke-width: 0.12; }
+.hint-forced-mark { fill: #1f4fc4; }
+.hint-lost { font-size: 0.7px; font-weight: 700; text-anchor: middle; dominant-baseline: central; fill: var(--bad); }
 .hint-loss { font-size: 0.36px; font-weight: 650; text-anchor: middle; dominant-baseline: central; fill: #222; }
 .hint-left { font-size: 0.2px; text-anchor: middle; dominant-baseline: central; fill: #222; fill-opacity: 0.7; }

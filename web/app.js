@@ -121,8 +121,9 @@ let hoverLayer = null;
 // White hints, drawn like ninepaths' candidates: a White disc ringed green / amber / red, the big
 // number the moves it gives up against White's best, the small one the most Black moves the
 // strategy can still need.  Most cells share one value (everything outside the card's region
-// gets the pass answer, and the opening card's region is nearly the whole board), so the most
-// common value is a small dot and only the cells that differ get a labelled disc.
+// gets the pass answer, and the opening card's region is nearly the whole board), so cells with
+// the most common value stay unmarked and only the cells that differ get a disc.  Black's
+// threats override: one is a forced move ("!"), two or more a forced loss ("✕" on each).
 const lossClass = (loss) => (loss === 0 ? 'good' : loss < 3 ? 'hot' : 'bad');
 
 function hintSummary() {
@@ -136,14 +137,25 @@ function hintSummary() {
 
 function drawHints() {
   const { vals, best, common } = hintSummary();
+  const threats = game.threats();
   const g = el('g', { 'pointer-events': 'none' }, svg);
+  if (threats.length >= 2) {
+    for (const cell of threats) {
+      const [cx, cy] = centre(cell);
+      el('text', { x: cx, y: cy, class: 'hint-lost' }, g).textContent = '✕';
+    }
+    return;
+  }
   for (const { cell, value } of vals) {
     const loss = best - value;
     const [cx, cy] = centre(cell);
-    if (value === common) {
-      el('circle', { cx, cy, r: 0.1, class: `hint-dot hint-${lossClass(loss)}` }, g);
+    if (threats[0] === cell) {
+      el('circle', { cx, cy, r: 0.42, class: 'hint-disc hint-forced' }, g);
+      el('text', { x: cx, y: cy - 0.05, class: 'hint-loss hint-forced-mark' }, g).textContent = '!';
+      el('text', { x: cx, y: cy + 0.25, class: 'hint-left' }, g).textContent = String(value);
       continue;
     }
+    if (value === common) continue;
     el('circle', { cx, cy, r: 0.42, class: `hint-disc hint-${lossClass(loss)}` }, g);
     el('text', { x: cx, y: cy - 0.05, class: 'hint-loss' }, g).textContent = String(loss);
     el('text', { x: cx, y: cy + 0.25, class: 'hint-left' }, g).textContent = String(value);
@@ -180,10 +192,18 @@ function renderPanel() {
   $('hints-help').hidden = !showHints;
   if (showHints) {
     const { best, common, commonLoss } = hintSummary();
-    $('hints-best').textContent = `Your best moves (green, 0) leave Black needing up to ${best} more.`;
-    $('hints-pass').textContent = commonLoss === 0
-      ? 'Every dotted cell is a best move too.'
-      : `Every dotted cell gives up ${commonLoss} (Black needs up to ${common}).`;
+    const threats = game.threats().map((c) => label(game.cols, c));
+    $('hints-best').textContent = threats.length >= 2
+      ? `Lost: Black wins next move at ${threats.join(' or ')} (✕), and you can block only one.`
+      : threats.length === 1
+        ? `Forced: Black wins at ${threats[0]} next move unless you play there (!).`
+        : `Your best moves (green, 0) leave Black needing up to ${best} more.`;
+    $('hints-pass').textContent = threats.length >= 2 ? '' : common === 1
+      ? 'Anywhere else, Black wins next move.'
+      : commonLoss === 0
+        ? 'Every unmarked cell is a best move too.'
+        : `Every unmarked cell gives up ${commonLoss} (Black needs up to ${common}).`;
+    $('hints-legend').hidden = threats.length >= 2;
   }
 
   const ol = $('moves');

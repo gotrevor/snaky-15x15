@@ -217,3 +217,36 @@ test('a hint value is what the counter shows after playing it, and never beats b
     }
   }
 });
+
+test('threats: none at the start; one (a forced move) and two (a forced loss) in recorded games', () => {
+  const g = new Game(cs);
+  assert.deepEqual(g.threats(), []);
+  // Black h8 i8 j8 k8 l9: only k9 completes a Snaky (h8-k8, k9, l9).
+  for (const w of ['e5', 'f6', 'j11', 'j9']) g.whiteMove(parseLabel(15, w));
+  assert.deepEqual(g.threats().map((c) => label(15, c)), ['k9']);
+  const lost = new Game(cs);
+  for (const w of ['f9', 'k6', 'k8', 'k11', 'g5', 'g3']) lost.whiteMove(parseLabel(15, w));
+  assert.deepEqual(lost.threats().map((c) => label(15, c)).sort(), ['i3', 'i5']);
+});
+
+test('blocking a lone threat never hands Black a win at once; ignoring it always does', () => {
+  const r = rng(5);
+  let forced = 0;
+  for (let n = 0; n < 300; n++) {
+    const g = new Game(cs);
+    while (!g.won) {
+      const t = g.threats();
+      if (t.length === 1) {
+        forced++;
+        const ignore = new Game(cs);
+        for (const m of g.history.filter((h) => h.color === WHITE)) ignore.whiteMove(m.cell);
+        ignore.whiteMove(freeCells(ignore).find((c) => c !== t[0]));
+        assert.ok(ignore.won, 'ignoring the threat lets Black complete it');
+      }
+      const f = freeCells(g);
+      g.whiteMove(t.length === 1 ? t[0] : f[Math.floor(r() * f.length)]);
+      if (t.length === 1 && !g.won) assert.notEqual(g.history.at(-1).cell, t[0]);
+    }
+  }
+  assert.ok(forced > 50, `expected many forced moves, saw ${forced}`);
+});

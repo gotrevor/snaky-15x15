@@ -114,6 +114,7 @@ export class Game {
     this.history = [];           // [{color, cell}]
     this.won = null;             // the winning placement's cells, once Black has one
     this.offCard = 0;            // Black moves where G(p) was already Black's (any free cell)
+    this.shortcuts = 0;          // Black moves that took an immediate win instead of G(p)
     this.blackMove();
   }
 
@@ -158,7 +159,12 @@ export class Game {
     this.checkInvariant();
     const c = this.card();
     let cell = this.cell(app(this.G, c.p));
-    if (this.board[cell] !== EMPTY) {
+    const win = this.threats();
+    if (win.length) {
+      // An immediate win ends the game, so it needs no card; the cards don't always take one.
+      cell = win[0];
+      this.shortcuts++;
+    } else if (this.board[cell] !== EMPTY) {
       // G(p) is already Black's (White cannot own it: p is in S).  An extra Black stone never hurts.
       if (this.board[cell] !== BLACK) throw new Error('invariant: G(p) is White\'s');
       cell = this.board.indexOf(EMPTY);
@@ -187,15 +193,29 @@ export class Game {
 
   // White hints: for every empty cell, the most Black moves the strategy can still need after
   // White plays there - the next card's height, which equals the longest line through the card
-  // graph (a test checks this for every card).  `zone` marks cells in G(S); the rest all take
+  // graph (a test checks this for every card), or 1 if the move leaves Black an immediate win.  `zone` marks cells in G(S); the rest all take
   // the pass hint, so they share one value.
   whiteValues() {
     const c = this.card();
+    const threats = this.threats();
     const out = [];
     this.board.forEach((v, cell) => {
       if (v !== EMPTY) return;
       const [x, y] = unapp(this.G, this.xy(cell));
-      out.push({ cell, value: getCard(this.cs, this.hintFor(cell).j).h, zone: c.Sset.has(key(x, y)) });
+      // Unless White blocks Black's only threat, Black wins on its next move.
+      const blocks = threats.length === 0 || (threats.length === 1 && threats[0] === cell);
+      const value = blocks ? getCard(this.cs, this.hintFor(cell).j).h : 1;
+      out.push({ cell, value, zone: c.Sset.has(key(x, y)) });
+    });
+    return out;
+  }
+
+  // Empty cells where Black would complete a Snaky by playing next: one is a forced move for
+  // White, two or more are a forced loss.  A board fact, independent of the cards.
+  threats() {
+    const out = [];
+    this.board.forEach((v, c) => {
+      if (v === EMPTY && this.byCell[c].some((p) => p.every((i) => i === c || this.board[i] === BLACK))) out.push(c);
     });
     return out;
   }
@@ -204,6 +224,8 @@ export class Game {
   // answer would be "any free cell").
   answerTo(cell) {
     if (this.won || this.board[cell] !== EMPTY) return -1;
+    const win = this.threats().filter((t) => t !== cell);
+    if (win.length) return win[0];
     const hint = this.hintFor(cell);
     const i = this.cell(app(comp(this.G, hint.g), getCard(this.cs, hint.j).p));
     return i !== cell && this.board[i] === EMPTY ? i : -1;
