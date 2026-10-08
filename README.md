@@ -16,6 +16,6 @@ strategy-tree certificate checked by an independent checker:
 - `checker/check.py`: the checker; `tests/`: its tests, including rejection of corrupted certificates
 - `lean/`: the game and the theorem `Snaky.snaky_wins_15x15`, proved by a card checker that is proved sound and run on `cert/snaky-15x15-cards.txt` by the kernel, no `native_decide` (`tools/build-kernel`, about 9 min); `lean/Comparator/` is a comparator harness
 - `docs/notes/snaky.md`: context, method, and what remains open
-- `web/`: a static page where you play White against Black's card strategy (`web/engine.js` follows the same card file the Lean theorem checks, asserting the soundness invariant at every move; tests in `web/test/`).  `tools/build-web` assembles `build/web/` (five files, about 3.4 MB) for any static host, e.g. `wrangler pages deploy build/web --project-name snaky`
+- `web/`: a static page where you play White against Black's card strategy (`web/engine.js` follows the same card file the Lean theorem checks, asserting the soundness invariant at every move; tests in `web/test/`).  `tools/build-web` assembles `build/web/` for any static host; `tools/deploy-web --nine DIR` builds and deploys snaky.gotrevor.org, and refuses unless the checkout is a clean origin/main
 
 Apache-2.0.

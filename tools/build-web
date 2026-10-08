@@ -2,7 +2,8 @@
 """Assemble the static site into build/web/: the files in web/ plus the card set as cards.txt
 (and Sieben's 17 x 17 card set as cards-17x17.txt).
 The result is plain static files (no server code); upload the directory anywhere, e.g.
-`wrangler pages deploy build/web --project-name snaky`.
+`wrangler pages deploy build/web --project-name snaky`.  For snaky.gotrevor.org use tools/deploy-web,
+which refuses to deploy anything but a clean origin/main.
 
 The 9 x 9 page (9x9.html) reads a snapshot of the search from 9x9/: progress.json plus one
 certificate per proved first move.  The search runs elsewhere and its exporter writes that
