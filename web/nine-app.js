@@ -181,11 +181,12 @@ function certFor(rep) {
 }
 
 let busy = false;
+const FIRST = 'Your move: you are Black.  Pick a first move.';
 
 async function newGame(moves = []) {
   play = null;
   blacks = [];
-  setStatus('Your move: you are Black.  Pick a first move; the green ones are proved.', '');
+  setStatus(FIRST, '');
   for (const m of moves) {
     if (!(await blackMove(m, false))) break;
   }
@@ -198,19 +199,20 @@ async function blackMove(cell, draw = true) {
   if (!play) {
     const rep = classOf[cell];
     const rec = byRep.get(rep);
-    if (rec.status !== 'proved') {
-      setStatus(`${label(N, cell)} is still open, so there is no proof to play yet.`,
-        rec.exhausted ? `The search has reached depth ${rec.exhausted} without one.` : '');
-      return false;
-    }
-    busy = true;
-    setStatus(`Loading White's proof for ${rec.cell} (${num(rec.nodes)} nodes)…`, '');
-    let cert;
-    try { cert = await certFor(rep); } catch (e) { setStatus(String(e.message), ''); busy = false; return false; }
-    busy = false;
     const { g } = repOf(N, N, cell, [rep]);
     play = new Play(N, N);
-    play.firstMove(cell, cert, g);
+    if (rec.status !== 'proved') {
+      // An unknown path: no proof yet.  White answers the candidate reply, mapped onto this cell.
+      const c = rec.candidate ? parseLabel(N, rec.candidate) : -1;
+      play.firstMoveUnknown(cell, c >= 0 ? g.indexOf(c) : -1);
+    } else {
+      busy = true;
+      setStatus(`Loading White's proof for ${rec.cell} (${num(rec.nodes)} nodes)…`, '');
+      let cert;
+      try { cert = await certFor(rep); } catch (e) { setStatus(String(e.message), ''); busy = false; play = null; return false; }
+      busy = false;
+      play.firstMove(cell, cert, g);
+    }
     blacks = [cell];
   } else {
     if (play.won || play.board[cell] !== EMPTY) return false;
@@ -230,11 +232,29 @@ const WHY = {
   irrelevant: 'anywhere: your move is in no Snaky that can still fit',
   unpaired: 'anywhere: your move is in no pair, so it threatens nothing',
   taken: 'anywhere: the cell its proof names is already taken',
+  guess: 'a guess (the cell in the most Snakys still open), not a proof',
 };
 
 function describe() {
   const live = play.live().length;
   const last = play.history.at(-1);
+  const open = `${live} Snaky placement${live === 1 ? '' : 's'} still open to you.`;
+  if (play.unknown) {
+    const rec = byRep.get(classOf[blacks[0]]);
+    if (play.won === 'black') {
+      setStatus('Black made a Snaky, but only against White\'s guesses.',
+        `That says nothing about the proof: the search may still find White a defence after ${rec.cell}.`);
+    } else if (play.won === 'white') {
+      setStatus('No Snaky fits any more, but White was guessing.', 'Off the proof, so this line proves nothing.');
+    } else if (last.why === 'candidate') {
+      const ex = rec.exhausted ? `  The search has gone to depth ${rec.exhausted} without one.` : '';
+      setStatus(`Unknown path: no proof covers ${label(N, blacks[0])} yet.${ex}`,
+        `White answered ${label(N, last.cell)}, ${rec.candidate_source || 'a guess'}.  From here White guesses, so nothing in this line is proved.`);
+    } else {
+      setStatus(`Unknown path, your move.  ${open}`, `White played ${label(N, last.cell)}, ${WHY.guess}.`);
+    }
+    return;
+  }
   if (play.won === 'white') {
     setStatus('White wins: no Snaky fits anywhere now.', `White's last move ${label(N, last.cell)}.`);
     return;
@@ -243,52 +263,136 @@ function describe() {
     setStatus('Black made a Snaky: this certificate is wrong.  Please report it.', '');
     return;
   }
-  setStatus(`Your move.  ${live} Snaky placement${live === 1 ? '' : 's'} still open to you.`,
-    `White played ${label(N, last.cell)}, ${WHY[last.why] || last.why}.`);
+  setStatus(`Your move.  ${open}`, `White played ${label(N, last.cell)}, ${WHY[last.why] || last.why}.`);
 }
 
 function setStatus(a, b) { $('status').textContent = a; $('why').textContent = b; }
 
+// Black hints, as the 15 x 15 page's White hints: a disc ringed green / amber / red, the big
+// number the moves given up against Black's best known move, the small one the most Black moves
+// White's proof can still need after that move.  Cells with the most common value stay unmarked.
+// "?" marks an unknown path (no proof yet), "!" a Black win, a dot a dead cell.
+const lossClass = (loss) => (loss === 0 ? 'good' : loss < 3 ? 'hot' : 'bad');
+
+function blackHints() {
+  if (!play) {
+    return Array.from({ length: N * N }, (_, cell) => {
+      const rec = byRep.get(classOf[cell]);
+      return rec.status === 'proved' ? { cell, kind: 'value', value: rec.height } : { cell, kind: 'unknown' };
+    });
+  }
+  return play.won ? [] : play.hints();
+}
+
+function hintSummary(hints) {
+  const vals = hints.filter((h) => h.kind === 'value');
+  if (!vals.length) return { best: null, common: null };
+  const best = Math.max(...vals.map((h) => h.value));
+  const count = new Map();
+  for (const h of vals) count.set(h.value, (count.get(h.value) || 0) + 1);
+  const common = [...count].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0][0];
+  return { best, common };
+}
+
+function drawHints(hints) {
+  const { best, common } = hintSummary(hints);
+  const g = el('g', { 'pointer-events': 'none' }, svg);
+  for (const h of hints) {
+    const [cx, cy] = centre(h.cell);
+    if (h.kind === 'dead') {
+      el('circle', { cx, cy, r: 0.06, class: 'hint-dead' }, g);
+    } else if (h.kind === 'unknown') {
+      if (play && play.unknown) continue;   // off the proof every cell is unknown; the board tint says so
+      el('circle', { cx, cy, r: 0.42, class: 'hint-disc hint-unknown' }, g);
+      el('text', { x: cx, y: cy + 0.02, class: 'hint-loss hint-q' }, g).textContent = '?';
+    } else if (h.kind === 'win') {
+      el('circle', { cx, cy, r: 0.42, class: 'hint-disc hint-bad' }, g);
+      el('text', { x: cx, y: cy + 0.02, class: 'hint-lost' }, g).textContent = '!';
+    } else if (h.value !== common) {
+      el('circle', { cx, cy, r: 0.42, class: `hint-disc hint-${lossClass(best - h.value)}` }, g);
+      el('text', { x: cx, y: cy - 0.05, class: 'hint-loss' }, g).textContent = String(best - h.value);
+      el('text', { x: cx, y: cy + 0.25, class: 'hint-left' }, g).textContent = String(h.value);
+    }
+  }
+}
+
+function hintText(hints) {
+  const { best, common } = hintSummary(hints);
+  const unknown = hints.some((h) => h.kind === 'unknown');
+  const wins = hints.filter((h) => h.kind === 'win').map((h) => label(N, h.cell));
+  const view = play && play.view();
+  let head;
+  if (play && play.unknown) {
+    head = wins.length ? `Off the proof: Black wins at ${wins.join(' or ')} (!).`
+      : 'Off the proof (purple board): every move here is an unknown path.';
+  } else if (view && view.kind === 'pave') {
+    head = 'White holds a pairing: every move scores 0, and the pairing answers it.';
+  } else if (best === 0) {
+    head = 'Whatever you play, White\'s reply reaches a pairing: every move scores 0.';
+  } else if (best !== null) {
+    head = `Your best ${unknown ? 'known ' : ''}moves (green, 0) keep White's proof going for up to ${best} more Black moves.`;
+  } else head = '';
+  const rest = best === null || best === 0 || (view && view.kind === 'pave') ? '' : best === common
+    ? 'Every unmarked cell is a best move too.'
+    : `Every unmarked cell gives up ${best - common} (White's proof needs up to ${common} more).`;
+  return { head, rest, unknown: unknown && !(play && play.unknown), values: best !== null && best > 0 };
+}
+
 function drawPlay() {
-  const proved = (cell) => snap && byRep.get(classOf[cell]).status === 'proved';
+  svg.classList.toggle('offproof', !!(play && play.unknown));
   drawGrid((cell, r) => {
-    if (!play) {
-      r.classList.add(proved(cell) ? 'st-proved' : 'st-open', 'playable');
-      r.addEventListener('click', () => blackMove(cell));
-    } else if (!play.won && play.board[cell] === EMPTY) {
+    if (!play || (!play.won && play.board[cell] === EMPTY)) {
       r.classList.add('playable');
       r.addEventListener('click', () => blackMove(cell));
     }
   });
-  if (!play) return;
-  const view = play.view();
-  if (view && view.kind === 'pave' && $('pairs').checked) {
-    const g = el('g', { 'pointer-events': 'none' }, svg);
-    for (const [a, b] of view.pairs) {
-      const [x1, y1] = centre(a), [x2, y2] = centre(b);
-      el('line', { x1, y1, x2, y2, class: 'pair' }, g);
-      for (const [cx, cy] of [[x1, y1], [x2, y2]]) el('circle', { cx, cy, r: 0.11, class: 'pair-end' }, g);
+  const showHints = $('bhints').checked && snap;
+  const hints = showHints ? blackHints() : [];
+  if (play) {
+    const view = play.view();
+    if (view && view.kind === 'pave' && $('pairs').checked) {
+      const g = el('g', { 'pointer-events': 'none' }, svg);
+      for (const [a, b] of view.pairs) {
+        const [x1, y1] = centre(a), [x2, y2] = centre(b);
+        el('line', { x1, y1, x2, y2, class: 'pair' }, g);
+        for (const [cx, cy] of [[x1, y1], [x2, y2]]) el('circle', { cx, cy, r: 0.11, class: 'pair-end' }, g);
+      }
+    }
+    play.board.forEach((v, cell) => {
+      if (v === EMPTY) return;
+      const [cx, cy] = centre(cell);
+      el('circle', { cx, cy, r: 0.42, class: v === BLACK ? 'stone-b' : 'stone-w', 'pointer-events': 'none' }, svg);
+    });
+    const last = play.history.at(-1);
+    if (last) {
+      const [cx, cy] = centre(last.cell);
+      el('circle', { cx, cy, r: 0.18, class: 'last', 'pointer-events': 'none' }, svg);
     }
   }
-  play.board.forEach((v, cell) => {
-    if (v === EMPTY) return;
-    const [cx, cy] = centre(cell);
-    el('circle', { cx, cy, r: 0.42, class: v === BLACK ? 'stone-b' : 'stone-w', 'pointer-events': 'none' }, svg);
-  });
-  const last = play.history.at(-1);
-  if (last) {
-    const [cx, cy] = centre(last.cell);
-    el('circle', { cx, cy, r: 0.18, class: 'last', 'pointer-events': 'none' }, svg);
+  if (showHints) drawHints(hints);
+  const t = showHints ? hintText(hints) : null;
+  $('hints-help').hidden = !t;
+  if (t) {
+    $('hints-best').textContent = t.head;
+    $('hints-pass').textContent = t.rest;
+    $('hints-q').hidden = !t.unknown;
+    $('hints-legend').hidden = !t.values;
   }
   const list = $('moves');
   list.replaceChildren();
-  for (let i = 0; i < play.history.length; i += 2) {
+  const h = play ? play.history : [];
+  for (let i = 0; i < h.length; i += 2) {
     const li = document.createElement('li');
-    const w = play.history[i + 1];
-    li.textContent = `${label(N, play.history[i].cell)}  ${w ? label(N, w.cell) : ''}`;
+    const w = h[i + 1];
+    const mark = w && (w.why === 'guess' || w.why === 'candidate') ? ' ?' : '';
+    li.textContent = `${label(N, h[i].cell).padEnd(4)} ${w ? label(N, w.cell) + mark : ''}`;
     list.appendChild(li);
   }
   list.scrollTop = list.scrollHeight;
+  if (mode === 'play') {
+    const hash = blacks.map((c) => label(N, c)).join(',');
+    history.replaceState(null, '', `#play${hash ? '=' + hash : ''}`);
+  }
 }
 
 function setMode(m) {
@@ -297,7 +401,7 @@ function setMode(m) {
   $('tab-play').setAttribute('aria-selected', String(m === 'play'));
   $('progress-panel').hidden = m !== 'progress';
   $('play-panel').hidden = m !== 'play';
-  if (m === 'play' && !play) setStatus('Your move: you are Black.  Pick a first move; the green ones are proved.', '');
+  if (m === 'play' && !play) setStatus(FIRST, '');
   render();
 }
 
@@ -306,6 +410,7 @@ $('tab-play').addEventListener('click', () => setMode('play'));
 $('new').addEventListener('click', () => newGame());
 $('undo').addEventListener('click', () => newGame(blacks.slice(0, -1)));
 $('pairs').addEventListener('change', render);
+$('bhints').addEventListener('change', render);
 
 // Deep links: #play=c3,e4 starts a game with those Black moves; #c3 selects a first move.
 async function fromHash() {

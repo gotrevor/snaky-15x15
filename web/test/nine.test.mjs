@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { parseCert, getNode, symmetries, repOf, Play } from '../nine.js';
+import { parseCert, getNode, symmetries, repOf, height, Play } from '../nine.js';
 import { parseLabel, EMPTY, BLACK, WHITE } from '../engine.js';
 
 const load = (n) => readFileSync(fileURLToPath(new URL(`fixtures/snaky-${n}.txt`, import.meta.url)), 'utf8');
@@ -159,6 +159,62 @@ test('teeth: the pairing check catches an emptied pairing', () => {
   assert.ok(caught > 0, 'an empty pairing was never caught');
 });
 
+test('height: 0 at a pairing, 1 + the tallest child at a tree node', () => {
+  const c = parseCert(TEXT[7]);
+  for (let i = 0; i < c.lines.length; i++) {
+    if (!c.lines[i]) continue;
+    const n = getNode(c, i);
+    const want = n.pave ? 0 : Math.max(0, ...[...n.moves.values()].map((m) => 1 + height(c, m.child)));
+    assert.equal(height(c, i), want);
+  }
+  assert.equal(height(c, c.root), 2);   // 7 x 7: the exporter (Python) also gives 2
+});
+
+test("Black hints: each value is the height White's tree reaches after that move", () => {
+  const kinds = new Set();
+  for (const n of [6, 7]) {
+    const cert = parseCert(TEXT[n]);
+    for (let s = 0; s < 40; s++) {
+      const p = new Play(n, n);
+      p.attach(cert);
+      const rand = rng(77 * n + s);
+      while (!p.won) {
+        const hints = p.hints();
+        for (const h of hints) kinds.add(h.kind);
+        assert.ok(!hints.some((h) => h.kind === 'win' || h.kind === 'unknown'), 'a proved line offers Black a win or an unknown');
+        const h = hints[Math.floor(rand() * hints.length)];
+        const before = p.node;
+        p.black(h.cell);
+        if (h.kind === 'dead') assert.equal(p.node, before);
+        else if (getNode(cert, before).moves) assert.equal(height(cert, p.node), h.value);
+        else assert.equal(h.value, 0);
+      }
+    }
+  }
+  assert.deepEqual([...kinds].sort(), ['dead', 'value']);
+});
+
+test('off the proof: an open first move gets the candidate reply, then guesses, and hints say unknown', () => {
+  const p = new Play(9, 9);
+  const w = p.firstMoveUnknown(parseLabel(9, 'e5'), parseLabel(9, 'e4'));
+  assert.equal(w, parseLabel(9, 'e4'));
+  assert.ok(p.unknown);
+  assert.equal(p.history.at(-1).why, 'candidate');
+  assert.ok(p.hints().every((h) => h.kind === 'unknown'));
+  // Black's row-5 line: d5 f5 c5 g5 ... White guesses; Black's one-move wins show as 'win'.
+  const rand = rng(5);
+  let wins = 0;
+  for (let k = 0; k < 40 && !p.won; k++) {
+    const hs = p.hints();
+    wins += hs.filter((h) => h.kind === 'win').length;
+    const win = hs.find((h) => h.kind === 'win');
+    p.black(win ? win.cell : hs[Math.floor(rand() * hs.length)].cell);
+    if (!p.won || p.won === 'white') assert.equal(p.history.at(-1).why, 'guess');
+  }
+  assert.ok(p.won);
+  void wins;
+});
+
 // The real 9 x 9 certificates, when a snapshot directory is at hand (they are not in this repo):
 // SNAKY_WEB9=<dir with progress.json> node --test web/test
 const WEB9 = process.env.SNAKY_WEB9;
@@ -170,6 +226,7 @@ test('9 x 9 snapshot: random and greedy Black lose from every proved first move'
     const cert = parseCert(readFileSync(`${WEB9}/${m.cert}`, 'utf8'));
     const rep = parseLabel(9, m.cell);
     assert.equal(cert.black[0], rep);
+    assert.equal(height(cert, cert.root), m.height, `${m.cell}: height`);
     for (let cell = 0; cell < 81; cell++) {
       const r = repOf(9, 9, cell, reps);
       if (r.rep !== rep) continue;
