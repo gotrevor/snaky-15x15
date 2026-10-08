@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { parseCards, getCard, Game, label, parseLabel, EMPTY, BLACK, WHITE } from '../engine.js';
+import { parseCards, getCard, Game, Line, label, parseLabel, EMPTY, BLACK, WHITE } from '../engine.js';
 
 const CARDS = fileURLToPath(new URL('../../cert/snaky-15x15-cards.txt', import.meta.url));
 const text = readFileSync(CARDS, 'utf8');
@@ -249,4 +249,21 @@ test('blocking a lone threat never hands Black a win at once; ignoring it always
     }
   }
   assert.ok(forced > 50, `expected many forced moves, saw ${forced}`);
+});
+
+test('Line: ← takes back, → replays in order, a different move ends the replay line', () => {
+  const l = new Line([1, 2, 3]);
+  assert.ok(l.back()); assert.ok(l.back());
+  assert.deepEqual(l.whites, [1]);
+  assert.ok(l.forward());
+  assert.deepEqual(l.whites, [1, 2]);
+  l.play(3);                                  // the move → would replay: the line survives
+  assert.deepEqual([l.whites, l.redo], [[1, 2, 3], []]);
+  l.back(); l.back();
+  l.play(9);                                  // a different move: nothing left to replay
+  assert.deepEqual([l.whites, l.redo], [[1, 9], []]);
+  assert.equal(l.forward(), false);
+  assert.ok(l.back()); assert.ok(l.back());
+  assert.equal(l.back(), false);              // nothing before Black's opening move
+  assert.deepEqual(l.whites, []);
 });

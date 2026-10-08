@@ -1,4 +1,4 @@
-import { parseCards, Game, label, parseLabel, SNAKY, BLACK, WHITE, EMPTY } from './engine.js';
+import { parseCards, Game, Line, label, parseLabel, SNAKY, BLACK, WHITE, EMPTY } from './engine.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const $ = (id) => document.getElementById(id);
@@ -7,6 +7,7 @@ const svg = $('board');
 let cs = null;
 let game = null;
 let hover = -1;
+let line = new Line();  // White's moves, plus what ← took back for → to replay
 
 function el(name, attrs, parent) {
   const e = document.createElementNS(NS, name);
@@ -223,6 +224,7 @@ function renderPanel() {
 
 function play(cell) {
   if (game.won || game.board[cell] !== EMPTY) return;
+  line.play(cell);
   try {
     game.whiteMove(cell);
   } catch (e) {
@@ -255,12 +257,15 @@ async function main() {
   if (params.has('hints')) $('hints').checked = true;
   const whites = location.hash.slice(1).split('-').filter(Boolean).map((s) => parseLabel(cs.cols, s));
   newGame(whites.every((c) => c >= 0) ? whites : []);
+  line = new Line(whiteMoves());
 
-  $('new').addEventListener('click', () => newGame());
-  $('undo').addEventListener('click', () => newGame(whiteMoves().slice(0, -1)));
-  // The left-arrow key is "Take back", as in ninepaths.
+  $('new').addEventListener('click', () => { line = new Line(); newGame(); });
+  $('undo').addEventListener('click', () => { if (line.back()) newGame(line.whites); });
+  // ← is "Take back", as in ninepaths; → replays what ← took back.
   addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowLeft' && !e.altKey && !e.metaKey && !e.ctrlKey && !$('undo').disabled) $('undo').click();
+    if (e.altKey || e.metaKey || e.ctrlKey) return;
+    if (e.key === 'ArrowLeft' && !$('undo').disabled) $('undo').click();
+    if (e.key === 'ArrowRight' && line.redo.length) play(line.redo.at(-1));
   });
   $('view').addEventListener('change', render);
   $('hints').addEventListener('change', render);

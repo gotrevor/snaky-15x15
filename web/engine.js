@@ -253,3 +253,25 @@ export function parseLabel(cols, s) {
   if (!m) return -1;
   return (Number(m[2]) - 1) * cols + (m[1].charCodeAt(0) - 97);
 }
+
+// White's move line with take-back and replay: back() moves the last White move onto a redo
+// stack, forward() replays it, and a fresh move ends the replay line unless it is the very
+// move forward() would have replayed.
+export class Line {
+  constructor(whites = []) { this.whites = [...whites]; this.redo = []; }
+  back() {
+    if (!this.whites.length) return false;
+    this.redo.push(this.whites.pop());
+    return true;
+  }
+  forward() {
+    if (!this.redo.length) return false;
+    this.whites.push(this.redo.pop());
+    return true;
+  }
+  play(cell) {
+    if (this.redo.at(-1) === cell) this.redo.pop();
+    else this.redo = [];
+    this.whites.push(cell);
+  }
+}
