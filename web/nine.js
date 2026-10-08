@@ -16,7 +16,7 @@
 // certificate's frame; R2 and R3 are decided on it, exactly as the checker decided them.
 // Pure module, no DOM: the page and the tests share it.
 
-import { placements, label, EMPTY, BLACK, WHITE } from './engine.js';
+import { placements, label, parseLabel, EMPTY, BLACK, WHITE } from './engine.js';
 
 export const cellOf = (ch) => ch.charCodeAt(0) - 40;
 
@@ -277,5 +277,112 @@ export class Play {
       return { kind: 'pave', pairs };
     }
     return { kind: 'moves', answers: [...n.moves.keys()].map((c) => this.finv[c]) };
+  }
+}
+
+// Walking the live search on an open first move: a snaky-white-report-v1 map (written by the
+// prover every minute) keyed by the move path in the search's frame, "c2", "c2 d5", "c2 d5 e5",
+// ...; moves alternate Black, White.  A key ending on Black's move holds a White record
+// {side: "W", cands: {cell: status}} (or result "double threat"); a key ending on White's move
+// a Black record {side: "B", moves: {cell: [status, reply]}} (or result "paved" | "no depth left"
+// | "black won").  Black moves are listed up to the position's symmetry, so a move is mapped onto
+// a listed one by a symmetry fixing the position (the prover's stabilizer: live Snakys' union U
+// and Black's stones on U), and the frame follows, as in Play.
+export class Explorer {
+  constructor(rows, cols, nodes) {
+    this.rows = rows;
+    this.cols = cols;
+    this.nodes = nodes || {};
+    this.placements = placements(rows, cols);
+    this.syms = symmetries(rows, cols);
+    this.board = new Int8Array(rows * cols);
+    this.history = [];   // [{color, cell}] on the board
+    this.path = [];      // the same moves in the search's frame
+    this.f = this.syms[0];
+    this.finv = this.syms[0];
+  }
+
+  // Black's first move `cell`, with g mapping it onto the search's first move.
+  start(cell, g) {
+    this.f = g;
+    this.finv = invert(g);
+    this.place(cell);
+  }
+
+  toMove() { return this.history.length % 2 === 0 ? BLACK : WHITE; }
+  key() { return this.path.map((c) => label(this.cols, c)).join(' '); }
+  record() { return this.nodes[this.key()] || null; }
+
+  // Listed cells of the current record, in the search's frame, as a Map cell -> {status, reply}.
+  listed() {
+    const r = this.record();
+    const out = new Map();
+    if (!r) return out;
+    const entries = r.side === 'W' ? Object.entries(r.cands || {}).map(([k, s]) => [k, s, null])
+      : Object.entries(r.moves || {}).map(([k, [s, w]]) => [k, s, w]);
+    for (const [k, s, w] of entries) {
+      out.set(parseLabel(this.cols, k), { status: s, reply: w == null ? -1 : parseLabel(this.cols, w) });
+    }
+    return out;
+  }
+
+  normal() {
+    const vb = new Set(), vw = new Set();
+    this.path.forEach((c, i) => (i % 2 === 0 ? vb : vw).add(c));
+    const live = this.placements.filter((p) => p.every((i) => !vw.has(i)));
+    const U = new Set(live.flat());
+    return { U, Bn: new Set([...vb].filter((i) => U.has(i))) };
+  }
+
+  // A symmetry fixing the position that maps search cell c into `cells`, or null.
+  cover(c, cells) {
+    if (cells.has(c)) return this.syms[0];
+    const { U, Bn } = this.normal();
+    const fixes = (g, S) => [...S].every((i) => S.has(g[i]));
+    return this.syms.find((g) => cells.has(g[c]) && fixes(g, U) && fixes(g, Bn)) || null;
+  }
+
+  // For each empty board cell: {cell, status, reply} with status from the record, 'dead' (Black to
+  // move, in no live Snaky), 'unknown' (no record here, or the cell is not listed).
+  marks() {
+    const listed = this.listed();
+    const { U } = this.normal();
+    const black = this.toMove() === BLACK;
+    const out = [];
+    this.board.forEach((v, a) => {
+      if (v !== EMPTY) return;
+      const c = this.f[a];
+      if (black && !U.has(c)) { out.push({ cell: a, status: 'dead' }); return; }
+      const g = listed.size ? this.cover(c, listed) : null;
+      if (!g) { out.push({ cell: a, status: 'unknown' }); return; }
+      const e = listed.get(g[c]);
+      // The reply, back on the board: g fixes the position, so map through g's inverse.
+      const reply = e.reply < 0 ? -1 : this.finv[invert(g)[e.reply]];
+      out.push({ cell: a, status: e.status, reply });
+    });
+    return out;
+  }
+
+  place(cell) {
+    if (this.board[cell] !== EMPTY) throw new Error(`${label(this.cols, cell)} is taken`);
+    const color = this.toMove();
+    let c = this.f[cell];
+    if (this.path.length) {
+      const listed = this.listed();
+      const g = listed.size ? this.cover(c, listed) : null;
+      if (g && g !== this.syms[0]) {
+        this.f = this.f.map((v) => g[v]);
+        this.finv = invert(this.f);
+        c = g[c];
+      }
+    }
+    this.board[cell] = color;
+    this.history.push({ color, cell });
+    this.path.push(c);
+    return cell;
+  }
+
+  winner() {
+    return this.placements.some((p) => p.every((i) => this.board[i] === BLACK)) ? 'black' : null;
   }
 }

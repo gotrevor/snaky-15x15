@@ -55,6 +55,15 @@
         <li id="hints-q"><span class="key key-q">?</span> An unknown path: no proof covers this
           move yet.  You can play it, but from there White only guesses.</li>
       </ul>
+      <ul id="explore-help" class="help legend" hidden>
+        <li>Exploring an open first move: you play both sides, following the live search.</li>
+        <li><b class="xs-open">✕</b> open: the search has no answer yet at this depth (an open sub-line)
+          · <b class="xs-searching">…</b> being searched now · <b class="xs-proved">✓</b> proved deeper
+          · <b class="xs-pave">P</b> answered straight into a pairing · <b class="xs-skipped">–</b> skipped, an earlier move already refuted this reply.  Blank: not reached yet.  →: White's reply.</li>
+        <li id="xpass-wrap" hidden><label>Show <select id="xpass">
+          <option value="nodes">the pass in progress</option>
+          <option value="last">the last complete pass</option></select></label></li>
+      </ul>
       <label class="toggle"><input type="checkbox" id="pairs" checked> Show White's pairing</label>
       <p id="pairs-help" class="help">At a pairing, every Snaky that could still fit contains one
         linked pair.  Take one end and White takes the other.</p>
