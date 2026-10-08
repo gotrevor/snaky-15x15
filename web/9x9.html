@@ -16,6 +16,10 @@
 <main>
   <section class="board-wrap">
     <svg id="board" role="grid" aria-label="9 by 9 board"></svg>
+    <div id="play-buttons" class="buttons under-board" hidden>
+      <button id="undo" title="Take back your last move">Take back</button>
+      <button id="new">New game</button>
+    </div>
   </section>
 
   <aside class="panel">
@@ -43,10 +47,6 @@
       <div id="status" class="status" aria-live="polite"></div>
       <div id="why" class="bound"></div>
       <div id="hint-head" class="hint-head"></div>
-      <div class="buttons">
-        <button id="new">New game</button>
-        <button id="undo" title="Take back your last move">Take back</button>
-      </div>
       <label class="toggle"><input type="checkbox" id="bhints" checked> Black hints</label>
       <ul id="hints-help" class="help" hidden>
         <li id="hints-legend">Big number: Black moves you give up against your best known move.  Small: the most
