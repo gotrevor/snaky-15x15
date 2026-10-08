@@ -30,7 +30,7 @@ Root certificate sha256: `e9cd50f338b0e1b71d469bc32ccd41207907b9649c17da88dd8a85
 
 ## Context
 
-- Harary asked which polyominoes are "winners" in this game; Snaky is the one hexomino whose status stayed open.  Harary conjectured that Snaky wins on a 15 × 15 board (S. Boucher, PhD thesis, UQAM 2026, §7, citing Beck, *Combinatorial Games: Tic-Tac-Toe Theory*, 2008, where the conjecture is traced to a colleague of Harary who won every game on that board as first player).  Boucher's thesis (January 2026) lists Snaky's status as open.
+- Harary asked which polyominoes are "winners" in this game; Snaky is the one hexomino whose status stayed open.  Harary conjectured that Snaky is a winner, "and furthermore that this should be the case for boards of size 15 × 15 and more, at least" (S. Boucher and R. Villemaire, *Quantified Boolean Solving for Achievement Games*, KI 2021, LNAI 12873, pp. 30-43, citing M. Gardner, Mathematical Games, *Scientific American* 240(4), April 1979).  Beck, *Combinatorial Games: Tic-Tac-Toe Theory* (2008), traces the conjecture to a colleague of Harary who won every game on that board as first player (as cited in S. Boucher, PhD thesis, UQAM, January 2026, §7, which still lists Snaky's status as open).
 - Halupczok and Schlage-Puchta, *Achieving Snaky* (Integers 7, 2007), proved that Snaky loses on 8 × 8, wins in three dimensions, and wins on the plane with one extra Black stone (handicap 1).
 - OpenAI, *Snaky in 21 Maker moves* (2026): Maker wins on the plane within 21 moves, and on 17 × 17 (see the section above).
 
