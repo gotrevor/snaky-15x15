@@ -1,0 +1,10 @@
+{
+  "challenge_module": "Comparator.Snaky17.Challenge",
+  "solution_module": "Comparator.Snaky17.Solution",
+  "theorem_names": ["Snaky.snaky_wins_17x17_in_20", "Snaky.snaky_wins_17x17",
+                    "Snaky.placements_17x17_length", "Snaky.snaky_not_in_5_17x17",
+                    "Snaky.domino_wins_1x3_in_2", "Snaky.domino_not_in_1_1x3",
+                    "Snaky.no_placements_no_win", "Snaky.domino_wins_1x3", "Snaky.tromino_loses_1x3"],
+  "permitted_axioms": ["propext", "Quot.sound", "Classical.choice"],
+  "enable_nanoda": true
+}

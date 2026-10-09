@@ -1,5 +1,6 @@
 """Teeth for the Lean card checker (`lean/Snaky/Cards.lean`, run as `lean/.lake/build/bin/cardcheck`),
-the same `cardOK` / `rootOK` that `Snaky.snaky_wins_15x15` evaluates.  Unlike the Python card
+the same `cardOK` / `rootOK` that `Snaky.snaky_wins_15x15` and `Snaky.snaky_wins_17x17_in_20`
+evaluate.  Unlike the Python card
 checker it never searches: every request must carry a hint that checks.
 
 Hand-worked fixture (cells (x, y); Snaky = (0,0) (1,0) (2,0) (3,0) (3,1) (4,1), no symmetry):
@@ -30,6 +31,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXE = os.path.join(ROOT, "lean", ".lake", "build", "bin", "cardcheck")
 CONVERT = os.path.join(ROOT, "tools", "cards2txt.py")
 REAL = os.path.join(ROOT, "cert", "snaky-15x15-cards.txt")
+SIEBEN = os.path.join(ROOT, "third_party", "sieben", "cards-17x17.txt")
 
 SHAPE = [[0, 0], [1, 0], [2, 0], [3, 0], [3, 1], [4, 1]]
 P1 = [[0, 0], [1, 0], [2, 0], [3, 0], [3, 1], [4, 1]]
@@ -148,3 +150,36 @@ def test_real_set_corrupt_card(tmp_path):
     p.write_text("\n".join(lines))
     rc, out = cardcheck(p)
     assert rc == 1 and out.startswith("INVALID: card "), out
+
+
+def mutate(tmp_path, path, line, old, new):
+    """Copy a card file with the height (first field) of card `line - 1` changed from old to new."""
+    lines = open(path).read().split("\n")
+    row = lines[line].split(" ")
+    assert row[0] == old
+    row[0] = new
+    lines[line] = " ".join(row)
+    p = tmp_path / "mut.txt"
+    p.write_text("\n".join(lines))
+    return p
+
+
+@pytest.mark.skipif(not os.path.exists(SIEBEN), reason="card set missing")
+def test_sieben_17x17_set():
+    assert cardcheck(SIEBEN) == (0, "VALID cards=1738 root=1737 board=17x17")
+
+
+@pytest.mark.skipif(not os.path.exists(SIEBEN), reason="card set missing")
+def test_sieben_17x17_corrupt_card(tmp_path):
+    # Card 1, the most-cited finishing card (3,633 hints), raised from height 1 to 30: still won,
+    # but every card citing it now cites a card that is not lower.
+    rc, out = cardcheck(mutate(tmp_path, SIEBEN, 1 + 1, "1", "30"))
+    assert rc == 1 and out.startswith("INVALID: card "), out
+
+
+@pytest.mark.skipif(not os.path.exists(SIEBEN), reason="card set missing")
+def test_sieben_17x17_root_height_is_tight(tmp_path):
+    # The root card (1737, the last line) at height 19 instead of 20: one of its hints is a card
+    # of height 19, so the 20-move bound is the least the cards support.
+    assert cardcheck(mutate(tmp_path, SIEBEN, 1 + 1737, "20", "19")) == (
+        1, "INVALID: card 1737 not justified (1 cards fail)")

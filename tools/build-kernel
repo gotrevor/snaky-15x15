@@ -3,7 +3,8 @@
 the heaviest chunk theorems take several GB each, so running all 180 at once can exhaust RAM.
 
 Peak memory per proof module comes from `docs/kernel-measure.tsv` (tools/measure-kernel) when it
-lists the module, else is estimated from `lean/Snaky/Gen/modules.json` (cards2lean.py)
+lists the module, else is estimated from `lean/Snaky/Gen*/modules.json` (cards2lean.py; `Gen` is
+the 15 x 15 card set, `Gen17` the 17 x 17 one)
 as BASE + 2 KB per unit (the probe's cost model), and chunks are built in batches whose estimates
 sum to at most --budget GB (and at most --jobs chunks).  A batch holds only modules whose proof-module
 imports are already built, so Lake never pulls an unbudgeted dependency into a batch (the glue module
@@ -12,6 +13,7 @@ of a split card imports its pieces).  Then the rest of the library is built.
 usage: build-kernel [--budget GB] [--jobs N]
   --budget defaults to 70% of physical RAM, --jobs to the CPU count.
 """
+import glob
 import json
 import os
 import subprocess
@@ -34,7 +36,9 @@ def main():
     ram_gb = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 1e9
     budget = float(opts.get("--budget", 0.7 * ram_gb))
     jobs = int(opts.get("--jobs", os.cpu_count() or 4))
-    mods = json.load(open(os.path.join(LEAN, "Snaky", "Gen", "modules.json")))
+    gens = sorted(glob.glob(os.path.join(LEAN, "Snaky", "Gen*", "modules.json")))
+    mods = [m for g in gens for m in json.load(open(g))]
+    trees = [f"Snaky.{os.path.basename(os.path.dirname(g))}.Tree" for g in gens]
     est = {m["module"]: BASE_GB + GB_PER_UNIT * m["units"] for m in mods}
     # measured peaks (tools/measure-kernel, copied to docs/) override the estimate, plus 10%
     measured = os.path.join(HERE, "docs", "kernel-measure.tsv")
@@ -60,7 +64,7 @@ def main():
     print(f"[build-kernel] {len(est)} proof modules, {len(batches)} batches, budget {budget:.1f} GB, "
           f"{jobs} jobs", flush=True)
     t0 = time.time()
-    subprocess.run(["lake", "build", "Snaky.Gen.Tree"], cwd=LEAN, check=True)
+    subprocess.run(["lake", "build", *trees], cwd=LEAN, check=True)
     for b, ks in enumerate(batches):
         print(f"[build-kernel] batch {b + 1}/{len(batches)}: {len(ks)} modules, "
               f"est {sum(est[k] for k in ks):.1f} GB, {time.time() - t0:.0f} s elapsed", flush=True)

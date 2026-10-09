@@ -30,7 +30,8 @@ def run_schedule(tmp_path, *args):
 
 
 def proof_modules():
-    return {m["module"] for m in json.loads((ROOT / "lean/Snaky/Gen/modules.json").read_text())}
+    return {m["module"] for g in ("Gen", "Gen17")
+            for m in json.loads((ROOT / f"lean/Snaky/{g}/modules.json").read_text())}
 
 
 def proof_imports(module, mods):
@@ -42,7 +43,7 @@ def proof_imports(module, mods):
 def test_batches_build_dependencies_first(tmp_path):
     mods = proof_modules()
     _, calls = run_schedule(tmp_path, "--budget", "5.5", "--jobs", "2")
-    assert calls[0] == ["build", "Snaky.Gen.Tree"]
+    assert calls[0] == ["build", "Snaky.Gen.Tree", "Snaky.Gen17.Tree"]
     assert calls[-1] == ["build"]
     built, missing = set(), {}
     for call in calls[1:-1]:
