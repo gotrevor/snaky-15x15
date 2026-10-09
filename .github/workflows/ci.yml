@@ -43,10 +43,10 @@ jobs:
         run: |
           python3 tools/build-kernel
           (cd lean && lake build Comparator cardcheck)
-      - name: Axioms of the headline theorem
+      - name: Axioms of the headline theorems
         working-directory: lean
         run: |
-          printf 'import Snaky\n#print axioms Snaky.snaky_wins_15x15\n' > /tmp/Ax.lean
+          printf 'import Snaky\n#print axioms Snaky.snaky_wins_15x15\n#print axioms Snaky.snaky_wins_17x17_in_20\n' > /tmp/Ax.lean
           lake env lean /tmp/Ax.lean | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Tests
         run: |
@@ -80,5 +80,8 @@ jobs:
         run: |
           export PATH="$HOME/verifier-bin:$PATH"
           set -o pipefail
-          /usr/bin/time -v lake env comparator Comparator/Snaky/config.json 2>&1 | tee /tmp/comparator.log
-          grep -E "Elapsed|Maximum resident" /tmp/comparator.log >> "$GITHUB_STEP_SUMMARY" || true
+          for c in Snaky Snaky17; do
+            echo "### comparator $c" >> "$GITHUB_STEP_SUMMARY"
+            /usr/bin/time -v lake env comparator Comparator/$c/config.json 2>&1 | tee /tmp/comparator.log
+            grep -E "Elapsed|Maximum resident" /tmp/comparator.log >> "$GITHUB_STEP_SUMMARY" || true
+          done

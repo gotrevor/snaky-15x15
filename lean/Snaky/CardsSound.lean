@@ -1,16 +1,19 @@
 import Snaky.Cards
+import Snaky.Bounded
 
 /-!
 # Soundness of the card checker
 
 `cards_sound`: if every card `get` returns passes `cardOK get` and `rootOK get R C i g`, then Black wins the empty `R × C` board.
+`cards_sound_in`: and within `k` Black moves, if the root card's height is at most `k`.
 
 Invariant for card `c` placed by `g` at position `(B, W)` (Black to move):
 * every cell of `g(A)` is on the board and Black's;
 * every cell of `g(S)` is on the board and not White's;
 * `|B| + |W| + 2 h ≤ R C`, so both players always have a free cell.
 Extra Black stones are allowed anywhere: if `g(p)` is already Black's, Black plays any free cell.
-Induction on the height.
+Induction on the height: a card of height `h ≤ n` gives `BlackWinsIn … n`, since each Black move
+passes to a card of lower height.
 -/
 namespace Snaky
 
@@ -265,7 +268,7 @@ def Placed (R C : Nat) (c : Card) (g : Xf) (B W : List Nat) : Prop :=
 theorem sound_aux {get : Nat → Option Card}
     (hall : ∀ j c, get j = some c → cardOK get c = true) (R C : Nat) :
     ∀ n, ∀ c : Card, (∃ j : Nat, get j = some c) → c.h ≤ n → ∀ g : Xf, g.isOrient = true →
-      ∀ B W, Placed R C c g B W → BlackWins (placements R C snaky) (R * C) B W := by
+      ∀ B W, Placed R C c g B W → BlackWinsIn (placements R C snaky) (R * C) n B W := by
   intro n
   induction n with
   | zero =>
@@ -290,7 +293,7 @@ theorem sound_aux {get : Nat → Option Card}
       · obtain ⟨x, hx, hxB, hxW⟩ := exists_free hlt
         exact ⟨x, hx, hxB, hxW, List.mem_cons_of_mem _ hpB⟩
       · exact ⟨_, idx_lt hpon, hpB, hpW, List.mem_cons_self⟩
-    apply BlackWins.move B W b hbN hbB hbW
+    apply BlackWinsIn.move n B W b hbN hbB hbW
     have hBl : ∀ q ∈ c.p :: c.A, onBoard R C (g.app q) ∧ idx C (g.app q) ∈ b :: B := by
       intro q hq
       rcases List.mem_cons.1 hq with rfl | hqA
@@ -298,10 +301,10 @@ theorem sound_aux {get : Nat → Option Card}
       · exact ⟨(hAinv q hqA).1, List.mem_cons_of_mem _ (hAinv q hqA).2⟩
     rcases hrest with hwon | ⟨hpass, hreps⟩
     · obtain ⟨pl, hpl, hsub⟩ := won_image hwon hg fun q hq => (hBl q hq).1
-      refine WhiteToMoveLoses.won _ _ pl hpl fun x hx => ?_
+      refine WhiteToMoveLosesIn.won _ _ _ pl hpl fun x hx => ?_
       obtain ⟨q, hq, rfl⟩ := hsub x hx
       exact (hBl q hq).2
-    · apply WhiteToMoveLoses.reply
+    · apply WhiteToMoveLosesIn.reply
       · apply exists_free
         simp only [List.length_append, List.length_cons] at hlen ⊢
         omega
@@ -310,7 +313,7 @@ theorem sound_aux {get : Nat → Option Card}
       have step : ∀ (hn : Hint) (Rg : Pt → Bool),
           (∀ s, Rg s = true → s ∈ c.S ∧ idx C (g.app s) ≠ w) →
           hintOK get c.h (c.p :: c.A) Rg hn = true →
-          BlackWins (placements R C snaky) (R * C) (b :: B) (w :: W) := by
+          BlackWinsIn (placements R C snaky) (R * C) n (b :: B) (w :: W) := by
         intro hn Rg hRg hhint
         obtain ⟨c', hj', hlt', hor, hA', hS'⟩ := hintOK_spec hhint
         refine ih c' ⟨_, hj'⟩ (by omega) (g.comp hn.2) (Xf.isOrient_comp hg hor) _ _
@@ -350,20 +353,32 @@ theorem sound_aux {get : Nat → Option Card}
           exact ⟨hs, fun e => hex ⟨s, hs, e⟩⟩
         · simp at hpass
 
-/-- **Soundness of the card checker.** -/
-theorem cards_sound {get : Nat → Option Card} {R C i : Nat} {g : Xf}
-    (hall : ∀ j c, get j = some c → cardOK get c = true) (hroot : rootOK get R C i g = true) : BlackWins (placements R C snaky) (R * C) [] [] := by
+/-- **Soundness of the card checker, with the move bound**: Black wins within `k` moves when the
+root card's height is at most `k`. -/
+theorem cards_sound_in {get : Nat → Option Card} {R C i k : Nat} {g : Xf}
+    (hall : ∀ j c, get j = some c → cardOK get c = true) (hroot : rootOK get R C i g = true)
+    (hk : (get i).all (fun c => decide (c.h ≤ k)) = true) :
+    BlackWinsIn (placements R C snaky) (R * C) k [] [] := by
   unfold rootOK at hroot
   split at hroot
   · rename_i c hc
     simp only [Bool.and_eq_true, List.isEmpty_iff, List.all_eq_true, decide_eq_true_eq]
       at hroot
     obtain ⟨⟨⟨hA, hg⟩, hS⟩, hh⟩ := hroot
-    refine sound_aux hall R C c.h c ⟨i, hc⟩ (Nat.le_refl _) g hg [] [] ⟨?_, ?_, ?_⟩
+    rw [hc] at hk
+    simp only [Option.all_some, decide_eq_true_eq] at hk
+    refine sound_aux hall R C k c ⟨i, hc⟩ hk g hg [] [] ⟨?_, ?_, ?_⟩
     · simp [hA]
     · intro s hs; exact ⟨hS s hs, List.not_mem_nil⟩
     · simpa using hh
   · simp at hroot
+
+/-- **Soundness of the card checker.** -/
+theorem cards_sound {get : Nat → Option Card} {R C i : Nat} {g : Xf}
+    (hall : ∀ j c, get j = some c → cardOK get c = true) (hroot : rootOK get R C i g = true) : BlackWins (placements R C snaky) (R * C) [] [] := by
+  have hk : (get i).all (fun c => decide (c.h ≤ ((get i).map Card.h).getD 0)) = true := by
+    cases get i <;> simp
+  exact (cards_sound_in hall hroot hk).toBlackWins
 
 theorem CardSet.sound {s : CardSet} (h : s.ok = true) :
     BlackWins (placements s.rows s.cols snaky) (s.rows * s.cols) [] [] := by
@@ -375,5 +390,11 @@ theorem CardSet.sound {s : CardSet} (h : s.ok = true) :
 theorem CTree.sound {t : CTree} {R C i : Nat} {g : Xf} (hall : t.all (cardOK t.get) = true)
     (hroot : rootOK t.get R C i g = true) : BlackWins (placements R C snaky) (R * C) [] [] :=
   cards_sound (CTree.all_get hall) hroot
+
+/-- The kernel-checked form with the move bound. -/
+theorem CTree.sound_in {t : CTree} {R C i k : Nat} {g : Xf} (hall : t.all (cardOK t.get) = true)
+    (hroot : rootOK t.get R C i g = true) (hk : (t.get i).all (fun c => decide (c.h ≤ k)) = true) :
+    BlackWinsIn (placements R C snaky) (R * C) k [] [] :=
+  cards_sound_in (CTree.all_get hall) hroot hk
 
 end Snaky

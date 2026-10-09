@@ -11,6 +11,10 @@
 - Converted: 1,738 cards, root height 20 (heights recomputed as the longest line).
 - Checked: `lean/.lake/build/bin/cardcheck third_party/sieben/cards-17x17.txt` prints
   `VALID cards=1738 root=1737 board=17x17`, the same checker as `Snaky.snaky_wins_15x15` uses,
-  compiled (no kernel proof of this set).
+  compiled.
+- Proved: `Snaky.snaky_wins_17x17_in_20` (`lean/Snaky/Result17.lean`), the kernel running that
+  checker on this set (`lean/Snaky/Gen17/`, from `tools/cards2lean.py --name=Gen17`).  The Lean
+  proof is posted with his permission (email, 2026-10-09).  The sequence builds on OpenAI's
+  strategy (*Snaky in 21 Maker moves*, [openai/math](https://github.com/openai/math)).
 
 Regenerate: `tools/sieben2cards.py proof-sequence-20.html.gz third_party/sieben/cards-17x17.txt`.
