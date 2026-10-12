@@ -2,6 +2,8 @@
 
 [ Written by Claude (Anthropic) at Trevor Morris's direction; the search, the certificate and this note are machine-produced, and the certificate is the evidence. ]
 
+**Update 2026-10-12: Breaker wins on 9 × 9** (see "9 × 9: Breaker wins" below), so Snaky's board number, the smallest n with a first-player win on n × n, is between 10 and 15.
+
 **▶ Play it: [snaky.gotrevor.org](https://snaky.gotrevor.org)** - you take White against the strategy the Lean proof checks.  Optional hints score every White move, and "Show the proof's view" shades the region the current card covers.
 
 ## OpenAI's result, and what this adds
@@ -93,9 +95,28 @@ with no `sorry`: on the empty 17 × 17 board Black, moving first, owns a Snaky b
 
 The 20 is the strategy's bound, not a proved minimum for Snaky on 17 × 17.
 
+## 9 × 9: Breaker wins
+
+On the empty 9 × 9 board, White (Breaker) prevents Black (Maker, moving first) from ever owning a copy of Snaky.  A Breaker win on a board is a Breaker win on every board inside it, so with the 15 × 15 result the board number lies between 10 and 15.  Deciding 9 × 9 was posed as a challenge for solvers by V. Mayer-Eichberger and A. Saffidine (*Positional Games and QBF: The Corrective Encoding*, SAT 2020; arXiv 2005.05098), and S. Boucher's thesis (2026) still lists it as out of reach.  To our knowledge it was open; corrections are welcome.
+
+- **Certificate.**  A root that cites one White certificate per Black first move: up to the 8 board symmetries Black has 15 first moves, and each file proves White wins after Black's move and White's answer.  White answers e5 to a1, b1, c1, d1, e1, b2, c2, c3, e2, e3 and e4; e2 to d2; e3 to d3; e4 to d4 and to e5 (columns a-i from the left, rows 1-9 from the bottom).  The 15 files hold 3,650,251 nodes (the largest, e2, 817,303).  A White certificate is a tree of White replies to every relevant Black move, ending in *pavings*: disjoint pairs of empty cells such that every surviving placement contains a pair, so White blocks by answering inside the pair (the leaf rule of Halupczok and Schlage-Puchta's 8 × 8 proof).
+- **Download.**  [`snaky-9x9-certs.tar`](https://github.com/gotrevor/snaky-15x15/releases/download/9x9-certs/snaky-9x9-certs.tar) (115 MB, release [`9x9-certs`](https://github.com/gotrevor/snaky-15x15/releases/tag/9x9-certs)), sha256 `1b9a126cf2e5d93423302d214818ae83afb5e2efc9d9da2cb33d9ad93a1bbe29`; it holds the root `release-9x9/snaky-9x9.json`, the 15 gzipped files and their `SHA256SUMS`.
+- **Check.**  The same `checker/check.py` (White nodes may cite White certificates, like Black ones):
+
+```
+tar -xf snaky-9x9-certs.tar
+python3 checker/check.py release-9x9/snaky-9x9.json
+VALID white wins 9x9 (16 node-positions checked, 16 nodes, plus 15 cited files / 8484135 node-positions)
+```
+
+  About 25 minutes on one core and 5 GB of memory.
+- **Search.**  Seven first moves (a1 b1 c1 d1 e1 b2 c3) fell to iterative-deepening search.  The other eight used budgeted proof-number search with White's candidates ordered by a learned model: every Black reply first gets a small budget, only the replies left open are split further, and positions already proved inside earlier certificates (up to symmetry) are imported.  None of this is needed to check the certificate.
+- **Not in Lean yet.**  The 9 × 9 result rests on the certificate and the Python checker; a Lean proof would need a Breaker (paving-tree) checker alongside the card checker.
+
 ## Open
 
-- **Smaller boards.**  The certificate uses cells in all 15 rows and columns, so it says nothing directly about 13 × 13 or 14 × 14.  Thirteen of the 22 opening replies have sub-proofs that fit in 13 × 13 windows (at different offsets); the replies touching the centre use the full width.  The search never tried to keep proofs compact.
+- **The board number: 10 to 15.**  The next boards are 10 × 10 (does Breaker still win?) and 14 × 14 (does Maker already win?).
+- **Smaller boards for Maker.**  The 15 × 15 certificate uses cells in all 15 rows and columns, so it says nothing directly about 13 × 13 or 14 × 14.  Thirteen of the 22 opening replies have sub-proofs that fit in 13 × 13 windows (at different offsets); the replies touching the centre use the full width.  The search never tried to keep proofs compact.
 - **Fewest moves.**  The certificate does not minimise the number of Black moves.
 
 ## Reproduce
@@ -104,4 +125,5 @@ The 20 is the strategy's bound, not a proved minimum for Snaky on 17 × 17.
 ./verify                                            # about 18 minutes
 uv run --with pytest pytest -q tests                # checker teeth tests; SNAKY_FULL=1 adds the full check
 tools/build-kernel                                  # the Lean proof (about 9 minutes, kernel-checked)
+tar -xf snaky-9x9-certs.tar && python3 checker/check.py release-9x9/snaky-9x9.json   # 9 x 9, about 25 minutes
 ```

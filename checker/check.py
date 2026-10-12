@@ -28,6 +28,8 @@ Certificate (JSON, "format": "snaky-cert-v1"): "nodes" is a list, children are n
  claim "white" (Black to move at every node):
    {"pave": [[a, b], ...]}                       leaf, rule R4
    {"moves": [[b, w|null, child], ...]}          Black plays b, White answers w (null = pass)
+   {"cite": "file.json[.gz]", "sha256": hex}     a separate White certificate whose start
+                                                  position must equal the current one
  claim "black":
    Black node  {"play": b, "next": child}         child is a White node
    Black node  {"cite": "file.json[.gz]", "sha256": hex}
@@ -144,6 +146,10 @@ class Checker:
             return
         self.checked += 1
         n = self.node(i)
+        if "cite" in n:
+            self.check_cite_white(n, black, white)
+            self.done[key] = None
+            return
         free = self.cells - black - white
         live = self.live(white)
         for p in live:
@@ -185,7 +191,7 @@ class Checker:
         self.done[key] = None
 
     # ---- claim "black" ----------------------------------------------------------------------
-    def load_cited(self, n):
+    def load_cited(self, n, claim="black"):
         import hashlib
         require(isinstance(n.get("cite"), str), "cite must be a path")
         path = os.path.normpath(os.path.join(self.base, n["cite"]))
@@ -193,8 +199,8 @@ class Checker:
         require(hashlib.sha256(raw).hexdigest() == n.get("sha256"), f"sha256 mismatch for {path}")
         text = gzip.decompress(raw).decode() if path.endswith(".gz") else raw.decode()
         sub = json.loads(text)
-        require(sub.get("format") == "snaky-cert-v1" and sub.get("claim") == "black",
-                f"{path}: not a Black certificate")
+        require(sub.get("format") == "snaky-cert-v1" and sub.get("claim") == claim,
+                f"{path}: not a {claim.capitalize()} certificate")
         require((sub["rows"], sub["cols"]) == (self.rows, self.cols) and
                 sorted(map(tuple, sub["shape"])) == sorted(map(tuple, self.cert["shape"])),
                 f"{path}: different board or shape")
@@ -213,6 +219,20 @@ class Checker:
         self.stats["positions"] += ch.checked
         self.verified[key] = s
         return s
+
+    def check_cite_white(self, n, black, white):
+        """A White node that cites a separate White certificate starting at (black, white)."""
+        path, sub = self.load_cited(n, "white")
+        require(frozenset(sub["black"]) == black and frozenset(sub["white"]) == white,
+                f"{path}: start position differs from the citing position")
+        key = ("white", path, black, white)
+        if key in self.verified:
+            return
+        ch = Checker(sub, os.path.dirname(path), self.verified, self.stats)
+        ch.white_node(sub["root"], black, white)
+        self.stats["files"] += 1
+        self.stats["positions"] += ch.checked
+        self.verified[key] = True
 
     def black_node(self, i, black, white):
         """Check that Black to move wins from (black, white) by node i; return the strategy's supp."""
