@@ -129,3 +129,55 @@ def test_pass_zone_covers_mirrored_support(tmp_path):
     c["nodes"][1]["replies"].append([7, 10])
     rc, out = mutated(tmp_path, c)
     assert rc == 0 and out.startswith("VALID black wins 1x19"), out
+
+
+def _subtree(c, ch, black, white):
+    """The white-claim subtree under node ch, renumbered, rooted at (black, white)."""
+    order, out, stack = {}, [], [(ch, False)]
+    while stack:
+        i, done = stack.pop()
+        if i in order:
+            continue
+        nd = c["nodes"][i]
+        if done or "moves" not in nd:
+            if "moves" in nd:
+                nd = {"moves": [[b, w, order[x]] for b, w, x in nd["moves"]]}
+            order[i] = len(out)
+            out.append(nd)
+            continue
+        stack.append((i, True))
+        stack.extend((x, False) for _, _, x in nd["moves"] if x not in order)
+    return {**{k: c[k] for k in ("format", "claim", "rows", "cols", "shape")},
+            "black": black, "white": white, "root": order[ch], "nodes": out}
+
+
+def test_white_cite_teeth(tmp_path):
+    """White citations (the 9 x 9 layout): the 7 x 7 proof split into one cited file per Black
+    first move checks VALID; swapped citations, a dropped first move and a tampered part fail."""
+    import hashlib
+    c = load("white-7x7.json")
+    moves, nodes = [], []
+    for b, w, ch in c["nodes"][c["root"]]["moves"]:
+        part = tmp_path / f"first-{b}.json"
+        part.write_text(json.dumps(_subtree(c, ch, [b], [w])))
+        moves.append([b, w, len(nodes)])
+        nodes.append({"cite": part.name, "sha256": hashlib.sha256(part.read_bytes()).hexdigest()})
+    assert len(moves) > 1
+    top = {**{k: c[k] for k in ("format", "claim", "rows", "cols", "shape")},
+           "black": [], "white": [], "root": len(nodes), "nodes": nodes + [{"moves": moves}]}
+    p = tmp_path / "top.json"
+    p.write_text(json.dumps(top))
+    rc, out = check(p)
+    assert rc == 0 and out.startswith("VALID white wins 7x7") and "cited files" in out, out
+    swapped = [[moves[0][0], moves[0][1], moves[1][2]], [moves[1][0], moves[1][1], moves[0][2]]]
+    for bad_moves in (swapped + moves[2:], moves[1:]):
+        bad = dict(top, nodes=nodes + [{"moves": bad_moves}], root=len(nodes))
+        q = tmp_path / "bad.json"
+        q.write_text(json.dumps(bad))
+        assert check(q)[0] != 0
+    victim = tmp_path / "first-{}.json".format(moves[0][0])
+    data = json.loads(victim.read_text())
+    data["nodes"].append({"pave": []})
+    victim.write_text(json.dumps(data))
+    rc, out = check(p)
+    assert rc != 0 and "sha256 mismatch" in out, out
