@@ -1,123 +1,34 @@
-# Snaky is a first-player win on 15 × 15
+# Snaky: results
 
 [ Written by Claude (Anthropic) at Trevor Morris's direction; the search, the certificate and this note are machine-produced, and the certificate is the evidence. ]
 
-**Update 2026-10-12: Breaker wins on 9 × 9** (see "9 × 9: Breaker wins" below), so Snaky's board number, the smallest n with a first-player win on n × n, is between 10 and 15.
-
 **▶ Play it: [snaky.gotrevor.org](https://snaky.gotrevor.org)** - you take White against the strategy the Lean proof checks.  Optional hints score every White move, and "Show the proof's view" shades the region the current card covers.
 
-## OpenAI's result, and what this adds
+Snaky is the hexomino {(0,0),(1,0),(2,0),(3,0),(3,1),(4,1)}.  In its weak (maker-breaker) achievement game, Black (Maker) and White (Breaker) alternately claim cells of a board, Black first; Black wins on owning all six cells of some copy of Snaky (any rotation or reflection, inside the board), and White wins by preventing that.  A Maker win on a board carries to every larger board and to the plane; a Breaker win carries to every smaller board.
 
-OpenAI's preprint *Snaky in 21 Maker moves* (2026-09-25, problem 187 in [`github.com/openai/math`](https://github.com/openai/math)) settled the open question: the first player (Maker) wins Snaky on the empty infinite board, within 21 of its own moves.  Their Lean 4 proof covers the infinite board.  The paper also shows (Corollary 6) that the same bound holds on a 17 × 17 board, because Maker's claims stay inside a fixed 251-cell region; that finite-board statement is proved on paper, not in Lean.  Nándor Sieben's 20-move proof sequence, built from OpenAI's strategy, is now checked here in Lean on 17 × 17 (see "17 × 17 within 20 moves" below).
+## Results
 
-This repository adds three things:
+| Board | Result | Evidence | Details |
+|---|---|---|---|
+| 9 × 9 | **Breaker wins** (2026-10-12) | certificate, 3.65 M nodes, independent checker | [snaky-9x9.md](snaky-9x9.md) |
+| 15 × 15 | **Maker wins** (2026-10-07) | Lean, kernel-checked (`snaky_wins_15x15`); certificate, 1,750 files | [snaky-15x15.md](snaky-15x15.md) |
+| 17 × 17 | **Maker wins within 20 moves** (Sieben's sequence, from OpenAI's strategy) | Lean, kernel-checked (`snaky_wins_17x17_in_20`) | [snaky-17x17.md](snaky-17x17.md) |
 
-- **A smaller board, 15 × 15.**  This is the board size in Harary's conjecture (see Context below), two rows and columns smaller than OpenAI's 17 × 17.  A win on 15 × 15 implies the win on the plane, so this is also a second, separately checked proof that Snaky wins on the plane (without OpenAI's 21-move bound).
-- **A finite-board Lean proof.**  `snaky_wins_15x15` is stated on the 15 × 15 board and checked by the Lean kernel, with no `native_decide` and only the standard axioms.
-- **A different kind of evidence.**  The win is also an explicit game tree (1,750 files) accepted by a stand-alone checker of about 330 lines of Python that shares no code with the search.
-
-OpenAI's work also helped directly: their 21-move strategy supplied the Black moves that closed the last three positions our search could not (see "The hardest case" below).  The proofs of those positions are this repository's own trees.
-
-## The result
-
-In the weak (maker-breaker) achievement game for Snaky, the hexomino {(0,0),(1,0),(2,0),(3,0),(3,1),(4,1)}, the first player (Maker, "Black") wins on the empty 15 × 15 board.  Black claims cells, White claims cells to block, and Black wins on owning all six cells of some copy of Snaky (any rotation or reflection, inside the board).
-
-A win on 15 × 15 is a win on every larger board and on the infinite plane: Black plays the same strategy inside the window and answers any White move outside it with an arbitrary move.
-
-Besides the Lean proof (below), the evidence is a certificate: a Black strategy tree, 1,750 JSON files (93 MB, 12 MB compressed) in `cert/snaky-15x15.tar.gz`, accepted by the stand-alone checker in `checker/check.py`.  `./verify` checks the archive hash, unpacks it, and runs the checker (Python standard library only, about 18 minutes on one core and 20 GB of memory):
-
-```
-VALID black wins 15x15 (25 node-positions checked, 25 nodes, plus 1749 cited files / 145906126 node-positions; 7 symmetric covers widened a support)
-```
-
-Root certificate sha256: `e9cd50f338b0e1b71d469bc32ccd41207907b9649c17da88dd8a85b5e4997243`.
+So Snaky's **board number**, the smallest n with a first-player win on n × n, is **between 10 and 15**.  How the certificates are checked: [snaky-checker.md](snaky-checker.md).
 
 ## Context
 
+
 - Harary asked which polyominoes are "winners" in this game; Snaky is the one hexomino whose status stayed open.  Harary conjectured that Snaky is a winner, "and furthermore that this should be the case for boards of size 15 × 15 and more, at least" (S. Boucher and R. Villemaire, *Quantified Boolean Solving for Achievement Games*, KI 2021, LNAI 12873, pp. 30-43, citing M. Gardner, Mathematical Games, *Scientific American* 240(4), April 1979).  Beck, *Combinatorial Games: Tic-Tac-Toe Theory* (2008), traces the conjecture to a colleague of Harary who won every game on that board as first player (as cited in S. Boucher, PhD thesis, UQAM, January 2026, §7, which still lists Snaky's status as open).
 - Halupczok and Schlage-Puchta, *Achieving Snaky* (Integers 7, 2007), proved that Snaky loses on 8 × 8, wins in three dimensions, and wins on the plane with one extra Black stone (handicap 1).
-- OpenAI, *Snaky in 21 Maker moves* (2026): Maker wins on the plane within 21 moves, and on 17 × 17 (see the section above).
-
-## How the certificate is built
-
-- **Game tree with relevance zones.**  A Black node plays a cell.  A White node lists a zone Z of cells, a certificate child for each White reply in Z, and a "pass" child: a proof that Black wins even if White passes.  Any White move outside Z is covered by the pass child, because a Black win stays a win after extra White stones on cells that the winning strategy never plays or answers.  That support includes the mirror image of every child reused by symmetry, since a reused child is played in mirror image.
-- **Symmetry.**  If a board symmetry fixes the current position, one child covers each orbit of White replies.
-- **Citations.**  A node may cite another certificate file (by relative path and sha256) whose start position must equal the current position, and the checker verifies it recursively.  This is how the 1,750 files fit together.
-- **The opening.**  Black plays the centre h8.  A pass proof for "Black h8, White passes" (Black to move again) has a 107-cell zone, and the 22 symmetry classes of White replies inside it each have their own certificate.
-- **The search** that produced the certificate (in a separate working repository, not needed for verification) is a λ-search (threat-space) prover in Rust that writes certificates directly.  It recursively splits a position into "Black plays d, then every White reply in d's zone" sub-proofs, ranks candidate splits with a small convolutional network trained on earlier sub-proof outcomes, and orders its search best-first.
-- **The hardest case** was White's reply touching the centre (h7, equivalent to h9, g8, i8).  After Black g8, three White replies resisted the solver's own search: f9, g9 and f8.  They closed once the solver tried the moves of OpenAI's 21-move strategy as first candidates.  For example, Black answers f8 with h11, three rows above the centre, which the solver's candidate generation had never considered.  The proofs themselves are this repository's own trees, checked here; OpenAI's strategy contributed move choices only.  It also needs all 17 columns in this line, so it does not fit 15 × 15 directly.
-
-## What the checker checks
-
-`checker/check.py` (about 330 lines, no dependencies) reads a certificate and accepts only if:
-
-- every Black move is on a free cell;
-- every "won" leaf is a placement of the shape owned by Black;
-- every White node's zone, together with its pass child, covers all free cells: the zone must contain the support of the pass child's strategy (mirror images of symmetry-reused children included), and every zone cell needs a child, up to a symmetry that fixes the position;
-- every citation's file hash matches and its start position equals the citing position.
-
-The tests (`tests/test_checker.py`) show it rejects certificates with a dropped child, an occupied reply cell, a non-placement "won" set, a zone that misses part of the pass child's support, a missing pass child, the wrong shape, a tampered cited file, or a citation from the wrong position.  The checker shares no code with the search.
-
-## Lean
-
-`lean/Snaky/Game.lean` defines the game (`placements`, `BlackWins`) without Mathlib; `lean/Snaky/Result.lean` states
-
-```lean
-theorem snaky_wins_15x15 : BlackWins (placements 15 15 snaky) (15 * 15) [] []
-```
-
-with no `sorry`.  The proof does not replay the tree.  The tree certificate is first compressed (by the search repository; the compression is untrusted) into a set of 8,671 *cards*, `cert/snaky-15x15-cards.txt`.  A card (A, S, p, h) says: Black owns the cells A, White owns nothing in the region S, Black to move plays p and wins within h moves.  Cards apply under the 8 board symmetries plus translation.  A card is justified when A + p already holds a placement, or every White reply in S, and a White move outside S, leads to a position covered by a card of lower height.  This is the same kind of composition rule as OpenAI's 728-card strategy, with many more cards because they come from a search rather than a design.
-
-- `lean/Snaky/Cards.lean`: the card checker (`cardOK`, `rootOK`), which reads cards through a lookup function.  Every reply carries a hint (card index and map), which the checker verifies; there is no search.
-- `lean/Snaky/CardsSound.lean`: `cards_sound` (and its forms `CTree.sound`, `CardSet.sound`), any accepted card set gives `BlackWins` on the empty board.  It uses induction on the height, with the invariant "Black owns the image of A, White owns nothing in the image of S, and |B| + |W| + 2h ≤ R C" (so both players always have a free cell).  If the card's move is already Black's, Black plays any free cell; an extra Black stone never hurts.  The won case maps the plane placement into `placements` through the symmetries.  Axioms: `propext`, `Classical.choice`, `Quot.sound`.
-- `lean/Snaky/Gen/`: the card set as Lean data, generated by `tools/cards2lean.py` from the card text (a test checks the committed files match): one definition per card, a balanced lookup tree, and about 200 proof modules (`tK.all (cardOK getK) = true`, the two biggest cards in pieces), each discharged by the kernel (`decide +kernel`).  No `native_decide`: `#print axioms Snaky.snaky_wins_15x15` gives `propext`, `Classical.choice`, `Quot.sound`.
-- `lean/Snaky/Result.lean`: `snaky_wins_15x15 := CTree.sound Gen.tree_ok Gen.root_ok`.
-- `lean/Comparator/Snaky/`: a [comparator](https://github.com/leanprover/comparator) harness.  `Challenge.lean` imports nothing and writes out the game's definitions under their real names, so the claim can be read in one file.
-
-The kernel checks take about 25 CPU minutes; `tools/build-kernel` builds the chunks in batches under a memory budget (no module needs more than about 5 GB), about 9 minutes on a 16-core laptop.  `cd lean && lake build cardcheck && .lake/build/bin/cardcheck ../cert/snaky-15x15-cards.txt` runs the same checker as compiled code in under a second (`VALID cards=8671 root=0 board=15x15`); `tests/test_lean_cards.py` shows it rejects a wrong hint, a missing reply or pass hint, a height that does not drop, an enlarged required set, an unwinnable finishing card, a root with too little room, and a corrupted card in the real set; `tests/test_kernel_cards.py` shows the kernel accepts a hand-worked card set and rejects it when a height does not drop.
-
-## 17 × 17 within 20 moves
-
-`lean/Snaky/Result17.lean` states
-
-```lean
-theorem snaky_wins_17x17_in_20 : BlackWinsIn (placements 17 17 snaky) (17 * 17) 20 [] []
-theorem snaky_wins_17x17 : BlackWins (placements 17 17 snaky) (17 * 17) [] []
-```
-
-with no `sorry`: on the empty 17 × 17 board Black, moving first, owns a Snaky by her 20th move.  The strategy is Nándor Sieben's proof sequence for Snaky ([`github.com/nandorsieben/Snaky`](https://github.com/nandorsieben/Snaky), `proof-sequence-20.html.gz`), which is built from the strategy in OpenAI's *Snaky in 21 Maker moves* ([`github.com/openai/math`](https://github.com/openai/math), problem 187) and wins in one move fewer.  The sequence is his and the strategy it refines is OpenAI's; this repository contributes the conversion to cards and the Lean check, and posts it with his permission.
-
-- **Cards.**  `tools/sieben2cards.py` converts his 1,510 situations ("Maker's stones, Breaker to move", each region cell labelled with the situation that follows) into 1,738 cards, `third_party/sieben/cards-17x17.txt`, with root height 20.  The conversion is untrusted: the checker reads the cards with their hints, exactly as for 15 × 15.
-- **The move bound.**  `BlackWins` says nothing about length, so `lean/Snaky/Bounded.lean` adds `BlackWinsIn P N n B W`, the same game with a budget of `n` Black moves (the winning move counts; `BlackWinsIn.toBlackWins` forgets the budget).  The soundness induction already runs on card height, so it now proves `BlackWinsIn … n` for a card of height at most `n` (`cards_sound_in`, `CTree.sound_in`); `cards_sound` and `snaky_wins_15x15` are its unbounded corollaries, with their statements unchanged.  Controls in the same file: on a 1 × 3 board Black forces a domino within two moves but not one, and `snaky_not_in_5_17x17` shows five moves are too few for Snaky's six cells.
-- **Kernel check.**  The same `cardOK` and `rootOK`, run by the kernel on `lean/Snaky/Gen17/` (generated by `tools/cards2lean.py --name=Gen17`, 75 proof modules, `decide +kernel`, no `native_decide`), plus `Gen17.root_height`, a `decide +kernel` proof that the root card's height is at most 20.  `#print axioms Snaky.snaky_wins_17x17_in_20` gives `propext`, `Classical.choice`, `Quot.sound`.  The 17 × 17 modules take about 9 CPU minutes in all (summed module times, on a busy 16-core laptop), and no Lean process in the build exceeded 3.7 GB.
-- **Comparator.**  `lean/Comparator/Snaky17/Challenge.lean` (123 lines, imports nothing) writes out the game, `BlackWinsIn`, the two theorems and the controls; `config.json` beside it.
-- **Tests.**  `tests/test_lean_cards.py` runs `cardcheck` on the 17 × 17 set (`VALID cards=1738 root=1737 board=17x17`), and shows it rejects the set when the most-cited finishing card's height rises from 1 to 30, or when the root's height drops from 20 to 19 (one of its hints has height 19, so 20 is the least these cards support).  `tests/test_kernel_cards.py` checks the committed `Gen17/` matches the generator and that the kernel rejects the bound 19.
-
-The 20 is the strategy's bound, not a proved minimum for Snaky on 17 × 17.
-
-## 9 × 9: Breaker wins
-
-On the empty 9 × 9 board, White (Breaker) prevents Black (Maker, moving first) from ever owning a copy of Snaky.  A Breaker win on a board is a Breaker win on every board inside it, so with the 15 × 15 result the board number lies between 10 and 15.  Deciding 9 × 9 was posed as a challenge for solvers by V. Mayer-Eichberger and A. Saffidine (*Positional Games and QBF: The Corrective Encoding*, SAT 2020; arXiv 2005.05098), and S. Boucher's thesis (2026) still lists it as out of reach.  To our knowledge it was open; corrections are welcome.
-
-- **Certificate.**  A root that cites one White certificate per Black first move: up to the 8 board symmetries Black has 15 first moves, and each file proves White wins after Black's move and White's answer.  White answers e5 to a1, b1, c1, d1, e1, b2, c2, c3, e2, e3 and e4; e2 to d2; e3 to d3; e4 to d4 and to e5 (columns a-i from the left, rows 1-9 from the bottom).  The 15 files hold 3,650,251 nodes (the largest, e2, 817,303).  A White certificate is a tree of White replies to every relevant Black move, ending in *pavings*: disjoint pairs of empty cells such that every surviving placement contains a pair, so White blocks by answering inside the pair (the leaf rule of Halupczok and Schlage-Puchta's 8 × 8 proof).
-- **Download.**  [`snaky-9x9-certs.tar`](https://github.com/gotrevor/snaky-15x15/releases/download/9x9-certs/snaky-9x9-certs.tar) (115 MB, release [`9x9-certs`](https://github.com/gotrevor/snaky-15x15/releases/tag/9x9-certs)), sha256 `1b9a126cf2e5d93423302d214818ae83afb5e2efc9d9da2cb33d9ad93a1bbe29`; it holds the root `release-9x9/snaky-9x9.json`, the 15 gzipped files and their `SHA256SUMS`.
-- **Check.**  The same `checker/check.py` (White nodes may cite White certificates, like Black ones):
-
-```
-tar -xf snaky-9x9-certs.tar
-python3 checker/check.py release-9x9/snaky-9x9.json
-VALID white wins 9x9 (16 node-positions checked, 16 nodes, plus 15 cited files / 8484135 node-positions)
-```
-
-  About 25 minutes on one core and 5 GB of memory.
-- **Search.**  Seven first moves (a1 b1 c1 d1 e1 b2 c3) fell to iterative-deepening search.  The other eight used budgeted proof-number search with White's candidates ordered by a learned model: every Black reply first gets a small budget, only the replies left open are split further, and positions already proved inside earlier certificates (up to symmetry) are imported.  None of this is needed to check the certificate.
-- **Not in Lean yet.**  The 9 × 9 result rests on the certificate and the Python checker; a Lean proof would need a Breaker (paving-tree) checker alongside the card checker.
+- OpenAI, *Snaky in 21 Maker moves* (2026): Maker wins on the plane within 21 moves, and on 17 × 17 (paper corollary; checked here in Lean via Sieben's 20-move sequence, [snaky-17x17.md](snaky-17x17.md)).
+- V. Mayer-Eichberger and A. Saffidine, *Positional Games and QBF: The Corrective Encoding* (SAT 2020; arXiv 2005.05098), posed 9 × 9 as a challenge for solvers; settled in [snaky-9x9.md](snaky-9x9.md).
 
 ## Open
 
 - **The board number: 10 to 15.**  The next boards are 10 × 10 (does Breaker still win?) and 14 × 14 (does Maker already win?).
-- **Smaller boards for Maker.**  The 15 × 15 certificate uses cells in all 15 rows and columns, so it says nothing directly about 13 × 13 or 14 × 14.  Thirteen of the 22 opening replies have sub-proofs that fit in 13 × 13 windows (at different offsets); the replies touching the centre use the full width.  The search never tried to keep proofs compact.
-- **Fewest moves.**  The certificate does not minimise the number of Black moves.
+- **9 × 9 in Lean**, which needs a Breaker (paving-tree) checker beside the card checker.
+- **Fewest moves** on 15 × 15 and 17 × 17: neither strategy's bound is a proved minimum.
 
 ## Reproduce
 
