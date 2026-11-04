@@ -53,15 +53,15 @@ Seven first moves (a1 b1 c1 d1 e1 b2 c3) fell to iterative-deepening search.  Th
 
 [`gotrevor/positional-games`](https://github.com/gotrevor/positional-games) states the result as `Snaky.snaky_loses_9x9 : LosesOn9x9`, over the same game definition as the 15 × 15 proof (`Game.lean` is copied unchanged from this repository).  The proof has two parts:
 
-- `PositionalGames.Breaker.checkCert_sound`: if the Breaker checker accepts a certificate, White wins.  It is proved from the four rules the checker uses (pavings, an extra White stone never hurts, irrelevant cells, board symmetry), and `#print axioms` lists only `propext`, `Classical.choice` and `Quot.sound` (verified [DATE]).
-- The checker run on the encoded certificate (about [N] minutes and [M] GB to build) by `native_decide`, which adds `Lean.ofReduceBool`.
+- `PositionalGames.Breaker.checkCert_sound`: if the Breaker checker accepts a certificate, White wins.  It is proved from the four rules the checker uses (pavings, an extra White stone never hurts, irrelevant cells, board symmetry), and `#print axioms` lists only `propext`, `Classical.choice` and `Quot.sound` (verified 2026-11-04).
+- The checker run on the encoded certificate (about 20 minutes and 3.2 GB to build) by `native_decide`, which adds one axiom recording that evaluation (`Snaky.snaky_loses_9x9._native.native_decide.ax_1_1`).
 
 Reproduce: in a clone, `scripts/gen-9x9.sh && lake build Results9x9` (fetches the release above and checks its hash).  The same checker proves Breaker wins on 8 × 9 in a few seconds (`Snaky.snaky_loses_8x9`), and `Results/Controls.lean` checks that it rejects corrupted certificates.
 
 ## What is not claimed
 
-- **Not kernel-checked.**  The 15 × 15 result is checked by the Lean kernel; the 9 × 9 certificate is evaluated by `native_decide`, so the compiled checker code is trusted (axiom `Lean.ofReduceBool`).  The checker's soundness theorem is itself kernel-checked and uses no `native_decide`.
-- **One project.**  The Python checker shares no code with the search, and the Lean checker is proved sound, but both come from the same project and the Lean one ports the Python one's rules.  An independently written checker is the confirmation we would most value.
+- **Not kernel-checked.**  The 15 × 15 result is checked by the Lean kernel; the 9 × 9 certificate is evaluated by `native_decide`, so the Lean compiler is trusted along with the kernel.  The checker's soundness theorem is itself kernel-checked and uses no `native_decide`.
+- **One project.**  The Python checker shares no code with the search, and the Lean checker is proved sound, but both come from the same project and the Lean one ports the Python one's rules (with a stricter symmetry rule: a symmetry may stand in for a Black move only if it fixes both players' stones).  An independently written checker is the confirmation we would most value.
 - **Prior art.**  Our search for earlier solutions of 9 × 9 was not exhaustive.
 
 ## Next
