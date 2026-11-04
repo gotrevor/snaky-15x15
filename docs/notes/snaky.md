@@ -10,7 +10,7 @@ Snaky is the hexomino {(0,0),(1,0),(2,0),(3,0),(3,1),(4,1)}.  In its weak (maker
 
 | Board | Result | Evidence | Details |
 |---|---|---|---|
-| 9 × 9 | **Breaker wins** (2026-10-12) | certificate, 3.65 M nodes, independent checker | [snaky-9x9.md](snaky-9x9.md) |
+| 9 × 9 | **Breaker wins** (2026-10-12) | Lean, `native_decide` on a checker proved sound (`snaky_loses_9x9`); certificate, 3.65 M nodes | [snaky-9x9.md](snaky-9x9.md) |
 | 15 × 15 | **Maker wins** (2026-10-07) | Lean, kernel-checked (`snaky_wins_15x15`); certificate, 1,750 files | [snaky-15x15.md](snaky-15x15.md) |
 | 17 × 17 | **Maker wins within 20 moves** (Sieben's sequence, from OpenAI's strategy) | Lean, kernel-checked (`snaky_wins_17x17_in_20`) | [snaky-17x17.md](snaky-17x17.md) |
 
@@ -27,7 +27,6 @@ So Snaky's **board number**, the smallest n with a first-player win on n × n, i
 ## Open
 
 - **The board number: 10 to 15.**  The next boards are 10 × 10 (does Breaker still win?) and 14 × 14 (does Maker already win?).
-- **9 × 9 in Lean**, which needs a Breaker (paving-tree) checker beside the card checker.
 - **Fewest moves** on 15 × 15 and 17 × 17: neither strategy's bound is a proved minimum.
 
 ## Reproduce
